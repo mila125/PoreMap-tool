@@ -542,4 +542,4 @@ def draw_nested_rectangles():
     window.mainloop()   
 # Parámetros: rectángulo principal y subrectángulo
 
-draw_nested_rectangles()
+#draw_nested_rectangles()

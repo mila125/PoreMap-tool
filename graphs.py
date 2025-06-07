@@ -196,7 +196,8 @@ def draw_HK(df, archivo_planilla):
         os.remove(temp_image_path)
     else:
         print(f"El archivo '{archivo_planilla}' no existe. No se puede insertar el gráfico.")
-def graphs_main(archivo_planilla):
+def graphs_main(archivo_planilla, hoja='NKA'):
+    
     print("Inicio de graphs_main")
     print(archivo_planilla)
        
@@ -204,12 +205,13 @@ def graphs_main(archivo_planilla):
     valores_nkaffha = {}
     
     # Leer los datos de la hoja 'NKA'
-    df_nka = pd.read_excel(archivo_planilla, sheet_name='NKA')
+    df_nka = pd.read_excel(archivo_planilla, sheet_name=hoja)
     valores_nka = df_nka.tail(2)  # Obtener los dos últimos valores
     valores_nkaffha['NKA'] = valores_nka
     
     # Leer los datos de la hoja 'FFHA'
-    df_ffha = pd.read_excel(archivo_planilla, sheet_name='FFHA')
+    df_ffha = pd.read_excel(archivo_planilla, sheet_name=hoja)
+    #df_ffha = pd.read_excel(archivo_planilla, sheet_name='FFHA')
     valores_ffha = df_ffha.tail(2)  # Obtener los dos últimos valores
     valores_nkaffha['FFHA'] = valores_ffha
     

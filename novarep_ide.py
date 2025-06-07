@@ -7,6 +7,7 @@ from graphs import graphs_main
 from tests import tests_main
 from rangos_dft import rangos_dft_main
 from rectangles import draw_nested_rectangles
+from config_ini import main
 
 # Archivo de configuración
 config_file = "config.ini"
@@ -100,13 +101,14 @@ def cargar_archivo(ruta_excel):
 # Función para ejecutar módulos
 def ejecutar_modulo(funcion):
     ruta_excel = entry_excel.get()
+    hoja_seleccionada = combo_hojas.get()
     if not ruta_excel:
         label_estado.config(text="Selecciona un archivo Excel")
         return
-    print(f"Ejecutando {funcion.__name__} con Excel: {ruta_excel}")
+    print(f"Ejecutando {funcion.__name__} con Excel: {ruta_excel} y hoja: {hoja_seleccionada}")
     ventana.quit()
     ventana.destroy()
-    funcion(ruta_excel)
+    funcion(ruta_excel, hoja_seleccionada)  # PASA LA HOJA
 
 # Visualizar Excel (va en row=2 debajo del selector de archivo)
 Button(ventana, text="Visualizar Excel", command=lambda: cargar_archivo(entry_excel.get())).grid(row=2, column=0, columnspan=3, pady=10)
@@ -114,7 +116,10 @@ Button(ventana, text="Visualizar Excel", command=lambda: cargar_archivo(entry_ex
 Button(ventana, text="Visualizar histograma", command=lambda: ejecutar_modulo(graphs_main)).grid(row=5, column=0, pady=10)
 Button(ventana, text="Tests de poros (BET)", command=lambda: ejecutar_modulo(tests_main)).grid(row=5, column=1, pady=10)
 Button(ventana, text="Clasificar poros (DFT)", command=lambda: ejecutar_modulo(rangos_dft_main)).grid(row=5, column=2, pady=10)
-Button(ventana, text="Visualizar árbol", command=lambda: ejecutar_modulo(draw_nested_rectangles)).grid(row=5, column=3, pady=10)
+Button(ventana, text="Visualizar árbol", command=lambda: ejecutar_modulo(draw_nested_rectangles)).grid(row=7, column=1, pady=10)
+
+Button(ventana, text="Configuracion de inicio", command=lambda: ejecutar_modulo(main)).grid(row=7, column=2, pady=10)
+
 
 # Cargar configuración inicial
 def cargar_configuracion():

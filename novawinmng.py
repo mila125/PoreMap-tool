@@ -138,9 +138,14 @@ def manejar_novawin(path_novawin, archivo_qps):
 
 def inicializar_novawin(path_novawin):
     try:
+        
         app = Application(backend="uia").start(path_novawin)
         time.sleep(5)  # Esperar que se cargue NovaWin
         main_window = app.window(title_re=".*NovaWin.*")
+        # Ejemplo para poner ventana al frente (pero ojo, solo funciona si se permite)
+        main_window.set_focus()
+        main_window.minimize()  # para intentar minimizar sin perder control
+
         return app, main_window
     except Exception as e:
         print(f"Error al inicializar NovaWin: {e}")
@@ -160,6 +165,7 @@ def interactuar_con_cuadro_dialogo(dialog, archivo):
         edit_box.set_edit_text(archivo)
         open_button = dialog.child_window(class_name="Button", found_index=0)
         open_button.click_input()
+        main_window.restore()   # para restaurar
     except Exception as e:
         print(f"Error al interactuar con el cuadro de diálogo: {e}")
         raise
@@ -244,6 +250,7 @@ def close_window_novawin():
         window = app.window(title_re='.*NovaWin.*')
         # Cerrar la ventana
         window.close()
+        
         print("La ventana de NovaWin ha sido cerrada.")
     except Exception as e:
         print(f"Error al cerrar la ventana de NovaWin: {e}")
