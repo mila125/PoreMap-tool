@@ -4,15 +4,39 @@ import csv
 import traceback
 from datetime import datetime
 from pywinauto import Application, findwindows
+
 import time
 import threading
-from novawinmng import manejar_novawin, leer_csv_y_crear_dataframe,agregar_csv_a_plantilla_excel, guardar_dataframe_en_ini,generar_nombre_unico,agregar_dataframe_a_excel_sin_borrar,agregar_dataframe_a_nueva_hoja,close_window_novawin
+#from novawinmng import manejar_novawin, leer_csv_y_crear_dataframe,agregar_csv_a_plantilla_excel, guardar_dataframe_en_ini,generar_nombre_unico,agregar_dataframe_a_excel_sin_borrar,agregar_dataframe_a_nueva_hoja,close_window_novawin
 from pywinauto.keyboard import send_keys
 from openpyxl import Workbook
 # ejecutor.py
 import subprocess
 from queue import Queue
+def generar_nombre_unico(base_path, namext):
+    # Normalizar las barras a formato Unix (/)
+    base_path = base_path.replace("\\", "/")
+    
+    if not base_path.endswith(namext):
+        base_path += namext
 
+    # Extraer nombre base y extensión
+    name, ext = os.path.splitext(base_path)
+    
+    # Agregar fecha y hora actual al nombre base
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    name_with_timestamp = f"{name}_{timestamp}"
+    base_path = f"{name_with_timestamp}{ext}"
+    
+    # Asegurarse de que el nombre sea único
+    counter = 1
+    while os.path.exists(base_path):
+        base_path = f"{name_with_timestamp}_{counter}{ext}"
+        counter += 1
+    
+    # Normalizar las barras de regreso a formato Windows (\)
+    return base_path.replace("/", "\\")
+    
 # Función para manejar la exportación de reportes en un hilo
 def hilo_exportar_HK(main_window, path_csv, app, queue):
     try:
@@ -24,316 +48,204 @@ def hilo_exportar_HK(main_window, path_csv, app, queue):
         queue.put(None)
 def exportar_reporte_HK(main_window, ruta_exportacion, app):
     try:
-        # Imprimir detalles de los controles y ventanas hijas de main_window
-        all_controls = main_window.children()
-       # main_window.print_control_identifiers()
-
-        # Buscar el control por su clase
+        print("Buscando componente 'TGraphViewWindow'...")
         graph_view_window = main_window.child_window(class_name="TGraphViewWindow")
 
-        if graph_view_window.exists():
+        if graph_view_window.exists(timeout=5):
             print("Componente 'TGraphViewWindow' encontrado.")
-          #  graph_view_window.print_control_identifiers()
             graph_view_window.right_click_input()
             time.sleep(1)
         else:
-            print("No se encontró el componente 'TGraphViewWindow'.")
-
-        context_menu = app.window(title_re=".*Context.*")
-        tables_menu_item = context_menu.child_window(title="Tables", control_type="MenuItem")
-        tables_menu_item.click_input()
-        print("Menú 'Tables' seleccionado.")
-
-        HK_method_menu_item = app.window(best_match="Tables").child_window(title="HK method", control_type="MenuItem")
-        HK_method_menu_item.click_input()
-        print("Submenú 'HK method' seleccionado.")
-
-        HK_method_menu_item = app.window(best_match="HK method")
-      #  HK_method_menu_item.print_control_identifiers(depth=2)
-        Pore_Size_Distribution_menu_item = HK_method_menu_item.child_window(title=" Pore Size Distribution", control_type="MenuItem")
-        Pore_Size_Distribution_menu_item.click_input()
-        print("Se seleccionó ' Pore Size Distribution' exitosamente.")
-
-        time.sleep(1)
-        secondary_window2 = app.window(title_re=f".*tab:Pore Size Distribution: file_to_open_nameonly.*")
-        main_window.right_click_input()
+            raise Exception("No se encontró el componente 'TGraphViewWindow'.")
+        
+        send_keys('t')  # 'Tables'
+        time.sleep(0.3)
+        send_keys('e')  # 'HK method'
+        time.sleep(0.3)
+        send_keys('p')  # 'Pore Size Distribution'
+        print("Menú 'Pore Size Distribution' seleccionado.")
         time.sleep(1)
 
-        savecsv_menu_item = context_menu.child_window(title="Export to .CSV", control_type="MenuItem")
-        savecsv_menu_item.click_input()
-        print("Se seleccionó 'Export to .CSV' exitosamente.")
-
+        # Volver a hacer clic derecho para acceder al menú de exportación
+        graph_view_window.right_click_input()
+        time.sleep(0.5)
+        send_keys('x')  # 'Pore Size Distribution'
         time.sleep(1)
         csv_dialog = app.window(class_name="#32770")
+        csv_dialog.wait("visible ready", timeout=10)
+        print("Diálogo de guardado encontrado.")
 
-        print("llegó hasta aquí")
-        ruta_exportacion = generar_nombre_unico(ruta_exportacion,"hk.csv")
+        ruta_exportacion = generar_nombre_unico(ruta_exportacion, "hk.csv")
 
-         # Enfocar el cuadro de texto con Alt + M
-        send_keys('%m')  # % representa la tecla Alt en pywinauto
+        send_keys('%m')
         time.sleep(1)
-        send_keys(ruta_exportacion)  # % representa la tecla Alt en pywinauto
-        # Esperar hasta que el cuadro de texto esté enfocado
-        edit_box = csv_dialog.child_window(control_type="Edit", found_index=0)
+        send_keys(ruta_exportacion)
+        time.sleep(0.5)
+        send_keys('%g')  # Alt + G para guardar
+        print(" Presionado Alt+G")
+
+        # Esperar posible diálogo de sobrescritura (max 2 seg)
+        time.sleep(1.5)
+        print(" Intentando confirmar sobrescritura con Alt+S...")
+        send_keys('%s')  # Alt + S para confirmar "Sí, sobrescribir"
+        print(" Si apareció el diálogo, fue confirmado con Alt+S.")
+
+        ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
+        print(f" Archivo guardado en: {ruta_relativa}")
+        return ruta_relativa
        
 
-        csv_button = csv_dialog.child_window(control_type="Button", title="Guardar") \
-            if csv_dialog.child_window(control_type="Button", title="Guardar").exists() \
-            else csv_dialog.child_window(control_type="Button", title="Save")
-        
-        if csv_button.exists():
-            print("Existe el botón")
-            csv_button.click_input()
-            print("Archivo exportado exitosamente.")
-            # Obtener ruta relativa
-            ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
-            print(f"Archivo exportado correctamente en: {ruta_relativa}")
-            # Conecta con el proceso de NovaWin
-            return ruta_relativa
-        else:
-            raise Exception("Botón 'Guardar' no encontrado.")
+        print("Archivo exportado exitosamente.")
+        ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
+        print(f"Archivo exportado en: {ruta_relativa}")
+        return ruta_relativa
 
     except Exception as e:
         print(f"Error durante la exportación: {e}")
         traceback.print_exc()
+        return None
 
 def hilo_exportar_DFT(main_window, path_csv, app, queue):
     try:
-     # Aquí va la lógica para exportar el reporte
-     ruta_csv=exportar_reporte_DFT(main_window, path_csv, app)
-     queue.put(ruta_csv)  # Almacenar la ruta exportada
+        ruta_csv = exportar_reporte_DFT(main_window, path_csv, app)
+        queue.put(ruta_csv)
     except Exception as e:
-     print(f"Error en la exportación: {e}")
-     queue.put(None)
+        print(f" Error en la exportación: {e}")
+        queue.put(None)
+
 def exportar_reporte_DFT(main_window, ruta_exportacion, app):
     try:
-        # Imprimir detalles de los controles y ventanas hijas de main_window
-        all_controls = main_window.children()
-       # main_window.print_control_identifiers()
-
-        # Buscar el control por su clase
+        print(" Buscando componente 'TGraphViewWindow'...")
         graph_view_window = main_window.child_window(class_name="TGraphViewWindow")
 
-        if graph_view_window.exists():
-            print("Componente 'TGraphViewWindow' encontrado.")
-           # graph_view_window.print_control_identifiers()
-            graph_view_window.right_click_input()
-            time.sleep(1)
-        else:
-            print("No se encontró el componente 'TGraphViewWindow'.")
+        if not graph_view_window.exists(timeout=5):
+            raise Exception(" No se encontró 'TGraphViewWindow'.")
 
-        context_menu = app.window(title_re=".*Context.*")
-        tables_menu_item = context_menu.child_window(title="Tables", control_type="MenuItem")
-        tables_menu_item.click_input()
-        print("Menú 'Tables' seleccionado.")
+        print(" Componente encontrado. Clic derecho para menú.")
+        graph_view_window.right_click_input()
+        time.sleep(0.5)
 
-        bet_menu_item = app.window(best_match="Tables").child_window(title="DFT method", control_type="MenuItem")
-        bet_menu_item.click_input()
-        print("Submenú 'DFT method' seleccionado.")
+        print("Enviando teclas: T → F → P → X")
+        send_keys('t')  # Tables
+        time.sleep(0.3)
+        send_keys('f')  # DFT method
+        time.sleep(0.3)
+        send_keys('p')  # Pore Size Distribution
+        time.sleep(0.3)
+        send_keys('x')  # Export to .CSV
+        print(" Exportar a CSV solicitado.")
 
-        bet_menu_item = app.window(best_match="DFT method")
-     #   bet_menu_item.print_control_identifiers(depth=2)
-        single_point_menu_item = bet_menu_item.child_window(title=" Pore Size Distribution", control_type="MenuItem")
-        single_point_menu_item.click_input()
-        print("Se seleccionó ' Pore Size Distribution' exitosamente.")
-
-        time.sleep(1)
-        secondary_window2 = app.window(title_re=f".*tab: Pore Size Distribution: file_to_open_nameonly.*")
-        main_window.right_click_input()
-        time.sleep(1)
-
-        savecsv_menu_item = context_menu.child_window(title="Export to .CSV", control_type="MenuItem")
-        savecsv_menu_item.click_input()
-        print("Se seleccionó 'Export to .CSV' exitosamente.")
-
-        time.sleep(1)
+        # Esperar a que aparezca el diálogo
+        time.sleep(1.5)
         csv_dialog = app.window(class_name="#32770")
+        csv_dialog.wait("visible ready", timeout=10)
 
-        print("llegó hasta aquí")
-        ruta_exportacion = generar_nombre_unico(ruta_exportacion,"dft.csv")
-        # Enfocar el cuadro de texto con Alt + M
-        send_keys('%m')  # % representa la tecla Alt en pywinauto
-        time.sleep(1)
-        send_keys(ruta_exportacion)  # % representa la tecla Alt en pywinauto
-        # Esperar hasta que el cuadro de texto esté enfocado
-        edit_box = csv_dialog.child_window(control_type="Edit", found_index=0)
+        ruta_exportacion = generar_nombre_unico(ruta_exportacion, "dft.csv")
+        print(f" Ingresando ruta: {ruta_exportacion}")
+        send_keys(ruta_exportacion)
+        time.sleep(0.5)
 
-        csv_button = csv_dialog.child_window(control_type="Button", title="Guardar") \
-            if csv_dialog.child_window(control_type="Button", title="Guardar").exists() \
-            else csv_dialog.child_window(control_type="Button", title="Save")
-        
-        if csv_button.exists():
-            print("Existe el botón")
-            csv_button.click_input()
-            print("Archivo exportado exitosamente.")
+        send_keys('%g')  # Alt + G para guardar
+        print(" Presionado Alt+G")
 
-            return ruta_exportacion
-        else:
-            raise Exception("Botón 'Guardar' no encontrado.")
+        # Posible diálogo de sobrescritura
+        time.sleep(1.5)
+        send_keys('%s')  # Alt + S para confirmar sobrescritura
+        print(" Alt+S enviado por si hay confirmación.")
 
+        ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
+        print(f" Archivo DFT exportado en: {ruta_relativa}")
+        return ruta_relativa
 
     except Exception as e:
-        print(f"Error durante la exportación: {e}")
+        print(f" Error durante la exportación DFT: {e}")
         traceback.print_exc()
-def hilo_exportar_BJHA(main_window, path_csv, app,queue):
+        return None
+def exportar_reporte_BJH_con_teclas( main_window, ruta_exportacion, app):
+    """
+    Exporta reporte BJH Pore Size Distribution.
+    tipo: 'adsorption' o 'desorption'
+    """
     try:
-        # Aquí va la lógica para exportar el reporte
-        ruta_csv=exportar_reporte_BJHA(main_window, path_csv, app)
-        queue.put(ruta_csv)  # Almacenar la ruta exportada
-    except Exception as e:
-        print(f"Error en la exportación: {e}")
-        queue.put(None)
-def exportar_reporte_BJHA(main_window, ruta_exportacion, app):
-    try:
-        # Imprimir detalles de los controles y ventanas hijas de main_window
-        all_controls = main_window.children()
-       # main_window.print_control_identifiers()
-
-        # Buscar el control por su clase
+        print(" Buscando 'TGraphViewWindow'...")
         graph_view_window = main_window.child_window(class_name="TGraphViewWindow")
 
-        if graph_view_window.exists():
-            print("Componente 'TGraphViewWindow' encontrado.")
-            #graph_view_window.print_control_identifiers()
+        if not graph_view_window.exists(timeout=5):
+            raise Exception(" No se encontró 'TGraphViewWindow'.")
+
             graph_view_window.right_click_input()
-            time.sleep(1)
-        else:
-            print("No se encontró el componente 'TGraphViewWindow'.")
-       
-        context_menu = app.window(title_re=".*Context.*")
-        tables_menu_item = context_menu.child_window(title="Tables", control_type="MenuItem")
-        tables_menu_item.click_input()
-        print("Menú 'Tables' seleccionado.")
+            time.sleep(0.5)
 
-        BJHA_menu_item = app.window(best_match="Tables").child_window(title="BJH Pore Size Distribution", control_type="MenuItem")
-        BJHA_menu_item.click_input()
-        print("Submenú 'BJH Pore Size Distribution' seleccionado.")
-
-        BJHA_menu_item = app.window(best_match="BJH Pore Size Distribution")
-        BJHA_menu_item.print_control_identifiers(depth=2)
-        Adsorption_menu_item = BJHA_menu_item.child_window(title=" Adsorption ", control_type="MenuItem")
-        Adsorption_menu_item.click_input()
-        print("Se seleccionó ' Adsorption ' exitosamente.")
-
-        time.sleep(2)
-        secondary_window2 = app.window(title_re=f".*tab: Adsorption: file_to_open_nameonly.*")
-        main_window.right_click_input()
-        time.sleep(1)
-
-        savecsv_menu_item = context_menu.child_window(title="Export to .CSV", control_type="MenuItem")
-        savecsv_menu_item.click_input()
-        print("Se seleccionó 'Export to .CSV' exitosamente.")
-
-        time.sleep(2)
-        csv_dialog = app.window(class_name="#32770")
-
-        print("llegó hasta aquí")
-        ruta_exportacion = generar_nombre_unico(ruta_exportacion,"bjha.csv")
-        # Enfocar el cuadro de texto con Alt + M
-        send_keys('%m')  # % representa la tecla Alt en pywinauto
-        time.sleep(2)
-        send_keys(ruta_exportacion)  # % representa la tecla Alt en pywinauto
-        # Esperar hasta que el cuadro de texto esté enfocado
-        edit_box = csv_dialog.child_window(control_type="Edit", found_index=0)
-
-        csv_button = csv_dialog.child_window(control_type="Button", title="Guardar") \
-            if csv_dialog.child_window(control_type="Button", title="Guardar").exists() \
-            else csv_dialog.child_window(control_type="Button", title="Save")
-        
-        if csv_button.exists():
-            print("Existe el botón")
-            csv_button.click_input()
-            print("Archivo exportado exitosamente.")
-
-            return ruta_exportacion
-        else:
-            raise Exception("Botón 'Guardar' no encontrado.")
-
-
-    except Exception as e:
-        print(f"Error durante la exportación: {e}")
-        traceback.print_exc()
-
-def hilo_exportar_BJHD(main_window, path_csv, app,queue):
-    try:
-      # Aquí va la lógica para exportar el reporte
-      ruta_csv=exportar_reporte_BJHD(main_window, path_csv, app)
-      queue.put(ruta_csv)  # Almacenar la ruta exportada
-    except Exception as e:
-        print(f"Error en la exportación: {e}")
-        queue.put(None)
-
-def exportar_reporte_BJHD(main_window, ruta_exportacion, app):
-    try:
-        # Imprimir detalles de los controles y ventanas hijas de main_window
-        all_controls = main_window.children()
-     #   main_window.print_control_identifiers()
-
-        # Buscar el control por su clase
-        graph_view_window = main_window.child_window(class_name="TGraphViewWindow")
-
-        if graph_view_window.exists():
-            print("Componente 'TGraphViewWindow' encontrado.")
-           # graph_view_window.print_control_identifiers()
-            graph_view_window.right_click_input()
-            time.sleep(1)
-        else:
-            print("No se encontró el componente 'TGraphViewWindow'.")
-       
-        context_menu = app.window(title_re=".*Context.*")
-        tables_menu_item = context_menu.child_window(title="Tables", control_type="MenuItem")
-        tables_menu_item.click_input()
-        print("Menú 'Tables' seleccionado.")
-
-        BJHD_menu_item = app.window(best_match="Tables").child_window(title="BJH Pore Size Distribution", control_type="MenuItem")
-        BJHD_menu_item.click_input()
-        print("Submenú 'BJH Pore Size Distribution' seleccionado.")
-
-        BJHD_menu_item = app.window(best_match="BJH Pore Size Distribution")
-        BJHD_menu_item.print_control_identifiers(depth=2)
-        Desorption_menu_item = BJHD_menu_item.child_window(title=" Desorption ", control_type="MenuItem")
-        Desorption_menu_item.click_input()
-        print("Se seleccionó ' Desorption' exitosamente.")
-
-        time.sleep(2)
-        secondary_window2 = app.window(title_re=f".*tab: Desorption: file_to_open_nameonly.*")
-        main_window.right_click_input()
-        time.sleep(1)
-
-        savecsv_menu_item = context_menu.child_window(title="Export to .CSV", control_type="MenuItem")
-        savecsv_menu_item.click_input()
-        print("Se seleccionó 'Export to .CSV' exitosamente.")
-
-        time.sleep(2)
-        csv_dialog = app.window(class_name="#32770")
-
-        print("llegó hasta aquí")
-        ruta_exportacion = generar_nombre_unico(ruta_exportacion,"bjhd.csv")
-        # Enfocar el cuadro de texto con Alt + M
-        send_keys('%m')  # % representa la tecla Alt en pywinauto
-        time.sleep(2)
-        send_keys(ruta_exportacion)  # % representa la tecla Alt en pywinauto
-        # Esperar hasta que el cuadro de texto esté enfocado
-        edit_box = csv_dialog.child_window(control_type="Edit", found_index=0)
-
-
-        csv_button = csv_dialog.child_window(control_type="Button", title="Guardar") \
-            if csv_dialog.child_window(control_type="Button", title="Guardar").exists() \
-            else csv_dialog.child_window(control_type="Button", title="Save")
-        
-        if csv_button.exists():
-            print("Existe el botón")
-            csv_button.click_input()
-            print("Archivo exportado exitosamente.")
+            print(" Enviando secuencia de teclas: T  J  A/D  X")
+            send_keys('t')  # Tables
+            time.sleep(0.3)
+            send_keys('j')  # BJH Pore Size Distribution
+            time.sleep(0.3)
+            send_keys('a')
            
-            return ruta_exportacion
-        else:
-            raise Exception("Botón 'Guardar' no encontrado.")
+            ruta_exportacion = generar_nombre_unico(ruta_exportacion, "bjhd.csv")
+     
 
+            time.sleep(0.3)
+            send_keys('x')  # Export to .CSV
+            print(f" Menú BJH Export seleccionado.")
+
+            time.sleep(1.5)
+            csv_dialog = app.window(class_name="#32770")
+            csv_dialog.wait("visible", timeout=10)
+
+            print(" Ingresando ruta y guardando archivo...")
+            send_keys(ruta_exportacion)
+            time.sleep(0.5)
+            send_keys('%g')  # Alt + G para Guardar
+            print(" Alt+G enviado.")
+
+            time.sleep(1.5)
+            send_keys('%s')  # Alt + S para Sobrescribir si aparece
+            print(" Alt+S enviado (si es necesario).")
+
+            ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
+            print(f" Archivo exportado: {ruta_relativa}")
+        
+            graph_view_window.right_click_input()
+            time.sleep(0.5)
+
+            print(" Enviando secuencia de teclas: T  J  A/D  X")
+            send_keys('t')  # Tables
+            time.sleep(0.3)
+            send_keys('j')  # BJH Pore Size Distribution
+            time.sleep(0.3)
+            send_keys('d')
+           
+            ruta_exportacion = generar_nombre_unico(ruta_exportacion, "bjhd.csv")
+     
+
+        time.sleep(0.3)
+        send_keys('x')  # Export to .CSV
+        print(f" Menú BJH → {tipo} → Export seleccionado.")
+
+        time.sleep(1.5)
+        csv_dialog = app.window(class_name="#32770")
+        csv_dialog.wait("visible", timeout=10)
+
+        print(" Ingresando ruta y guardando archivo...")
+        send_keys(ruta_exportacion)
+        time.sleep(0.5)
+        send_keys('%g')  # Alt + G para Guardar
+        print(" Alt+G enviado.")
+
+        time.sleep(1.5)
+        send_keys('%s')  # Alt + S para Sobrescribir si aparece
+        print(" Alt+S enviado (si es necesario).")
+
+        ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
+        print(f" Archivo exportado: {ruta_relativa}")
+        return ruta_relativa
 
     except Exception as e:
-        print(f"Error durante la exportación: {e}")
+        print(f" Error exportando BJH: {e}")
         traceback.print_exc()
+        return None
 
 def hilo_exportar_FFHA(main_window, path_csv, app,queue):
     try:
@@ -343,155 +255,54 @@ def hilo_exportar_FFHA(main_window, path_csv, app,queue):
     except Exception as e:
         print(f"Error en la exportación: {e}")
         queue.put(None)
-def exportar_reporte_FFHA(main_window, ruta_exportacion, app):
+def exportar_reporte_fractal_con_teclas(main_window, ruta_exportacion, app,tipo):
     try:
-        # Imprimir detalles de los controles y ventanas hijas de main_window
-        all_controls = main_window.children()
-      #  main_window.print_control_identifiers()
-
-        # Buscar el control por su clase
+        print(" Buscando 'TGraphViewWindow'...")
         graph_view_window = main_window.child_window(class_name="TGraphViewWindow")
 
-        if graph_view_window.exists():
-            print("Componente 'TGraphViewWindow' encontrado.")
-           # graph_view_window.print_control_identifiers()
-            graph_view_window.right_click_input()
-            time.sleep(1)
-        else:
-            print("No se encontró el componente 'TGraphViewWindow'.")
-       
-        context_menu = app.window(title_re=".*Context.*")
-        tables_menu_item = context_menu.child_window(title="Tables", control_type="MenuItem")
-        tables_menu_item.click_input()
-        print("Menú 'Tables' seleccionado.")
+        if not graph_view_window.exists(timeout=5):
+            raise Exception(" No se encontró 'TGraphViewWindow'.")
 
-        Fractal_Dimension_Methods_menu_item = app.window(best_match="Tables").child_window(title="Fractal Dimension Methods", control_type="MenuItem")
-        Fractal_Dimension_Methods_menu_item.click_input()
-        print("Submenú 'Fractal Dimension Methods' seleccionado.")
+        # Click derecho para abrir el menú
+        graph_view_window.right_click_input()
+        time.sleep(0.5)
 
-        BJHD_menu_item = app.window(best_match="Fractal Dimension Methods")
-      #  BJHD_menu_item.print_control_identifiers(depth=2)
-        Adsorption_menu_item = BJHD_menu_item.child_window(title="FHH Method Fractal Dimension(Adsorption )", control_type="MenuItem")
-        Adsorption_menu_item.click_input()
-        print("Se seleccionó FHH Method Fractal Dimension(Adsorption )' exitosamente.")
+        print(" Enviando teclas: C  N  K  H")
+        send_keys('c')  # Tables
+        time.sleep(0.3)
+        send_keys('n')  # Fractal Dimension Methods
+        time.sleep(0.3)
+        send_keys(tipo)  # FHH Method Fractal Dimension (Adsorption)
+        time.sleep(0.3)
+        send_keys('h')  # Export to .CSV
+        print(" Menú FHH → Adsorption → Export seleccionado.")
 
-        time.sleep(2)
-        secondary_window2 = app.window(title_re=f".*tab: FHH Method Fractal Dimension(Adsorption ): file_to_open_nameonly.*")
-        main_window.right_click_input()
-        time.sleep(1)
-
-        savecsv_menu_item = context_menu.child_window(title="Export to .CSV", control_type="MenuItem")
-        savecsv_menu_item.click_input()
-        print("Se seleccionó 'Export to .CSV' exitosamente.")
-
-        time.sleep(2)
+        time.sleep(1.5)
         csv_dialog = app.window(class_name="#32770")
+        csv_dialog.wait("visible", timeout=10)
 
-        print("llegó hasta aquí")
-        ruta_exportacion = generar_nombre_unico(ruta_exportacion,"ffha.csv")
-        # Enfocar el cuadro de texto con Alt + M
-        send_keys('%m')  # % representa la tecla Alt en pywinauto
-        time.sleep(2)
-        send_keys(ruta_exportacion)  # % representa la tecla Alt en pywinauto
-        # Esperar hasta que el cuadro de texto esté enfocado
-        edit_box = csv_dialog.child_window(control_type="Edit", found_index=0)
+        ruta_exportacion = generar_nombre_unico(ruta_exportacion, "nka.csv")
 
-        csv_button = csv_dialog.child_window(control_type="Button", title="Guardar") \
-            if csv_dialog.child_window(control_type="Button", title="Guardar").exists() \
-            else csv_dialog.child_window(control_type="Button", title="Save")
+        print(f" Ingresando ruta: {ruta_exportacion}")
+        send_keys(ruta_exportacion)
+        time.sleep(0.5)
+
+        send_keys('%g')  # Alt + G para guardar
+        print(" Alt+G enviado")
+
+        time.sleep(1.5)
+        send_keys('%s')  # Alt + S para confirmar si ya existe
+        print(" Alt+S enviado (si corresponde)")
+
+        ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
+        print(f" Archivo exportado correctamente: {ruta_relativa}")
         
-        if csv_button.exists():
-            print("Existe el botón")
-            csv_button.click_input()
-            print("Archivo exportado exitosamente.")
-    
-            return ruta_exportacion
-        else:
-            raise Exception("Botón 'Guardar' no encontrado.")
-
+        return ruta_relativa
 
     except Exception as e:
-        print(f"Error durante la exportación: {e}")
+        print(f" Error durante la exportación FHH Adsorption: {e}")
         traceback.print_exc()
-
-def hilo_exportar_NKA(main_window, path_csv, app,queue):
-    try:
-        # Aquí va la lógica para exportar el reporte
-        ruta_csv=exportar_reporte_NKA(main_window, path_csv, app)
-        queue.put(ruta_csv)  # Almacenar la ruta exportada
-    except Exception as e:
-        print(f"Error en la exportación: {e}")
-        queue.put(None)
-def exportar_reporte_NKA(main_window, ruta_exportacion, app):
-    try:
-        # Imprimir detalles de los controles y ventanas hijas de main_window
-        all_controls = main_window.children()
-      #  main_window.print_control_identifiers()
-
-        # Buscar el control por su clase
-        graph_view_window = main_window.child_window(class_name="TGraphViewWindow")
-
-        if graph_view_window.exists():
-            print("Componente 'TGraphViewWindow' encontrado.")
-          #  graph_view_window.print_control_identifiers()
-            graph_view_window.right_click_input()
-            time.sleep(1)
-        else:
-            print("No se encontró el componente 'TGraphViewWindow'.")
-       
-        context_menu = app.window(title_re=".*Context.*")
-        tables_menu_item = context_menu.child_window(title="Tables", control_type="MenuItem")
-        tables_menu_item.click_input()
-        print("Menú 'Tables' seleccionado.")
-
-        Fractal_Dimension_Methods_menu_item = app.window(best_match="Tables").child_window(title="Fractal Dimension Methods", control_type="MenuItem")
-        Fractal_Dimension_Methods_menu_item.click_input()
-        print("Submenú 'Fractal Dimension Methods' seleccionado.")
-
-        BJHD_menu_item = app.window(best_match="Fractal Dimension Methods")
-      #  BJHD_menu_item.print_control_identifiers(depth=2)
-        Adsorption_menu_item = BJHD_menu_item.child_window(title="NK Method Fractal Dimension(Adsorption )", control_type="MenuItem")
-        Adsorption_menu_item.click_input()
-        print("Se seleccionó NK Method Fractal Dimension(Adsorption )' exitosamente.")
-
-        time.sleep(2)
-        secondary_window2 = app.window(title_re=f".*tab: NK Method Fractal Dimension(Adsorption ): file_to_open_nameonly.*")
-        main_window.right_click_input()
-        time.sleep(1)
-
-        savecsv_menu_item = context_menu.child_window(title="Export to .CSV", control_type="MenuItem")
-        savecsv_menu_item.click_input()
-        print("Se seleccionó 'Export to .CSV' exitosamente.")
-
-        time.sleep(2)
-        csv_dialog = app.window(class_name="#32770")
-
-        print("llegó hasta aquí")
-        ruta_exportacion = generar_nombre_unico(ruta_exportacion,"nka.csv")
-        # Enfocar el cuadro de texto con Alt + M
-        send_keys('%m')  # % representa la tecla Alt en pywinauto
-        time.sleep(2)
-        send_keys(ruta_exportacion)  # % representa la tecla Alt en pywinauto
-        # Esperar hasta que el cuadro de texto esté enfocado
-        edit_box = csv_dialog.child_window(control_type="Edit", found_index=0)
-
-        csv_button = csv_dialog.child_window(control_type="Button", title="Guardar") \
-            if csv_dialog.child_window(control_type="Button", title="Guardar").exists() \
-            else csv_dialog.child_window(control_type="Button", title="Save")
-        
-        if csv_button.exists():
-            print("Existe el botón")
-            csv_button.click_input()
-            print("Archivo exportado exitosamente.")
-     
-            return ruta_exportacion
-        else:
-            raise Exception("Botón 'Guardar' no encontrado.")
-
-
-    except Exception as e:
-        print(f"Error durante la exportación: {e}")
-        traceback.print_exc()
+        return None
         
 def hilo_exportar_BET(main_window, path_csv, app,queue):
     try:
@@ -501,76 +312,51 @@ def hilo_exportar_BET(main_window, path_csv, app,queue):
     except Exception as e:
         print(f"Error en la exportación: {e}")
         queue.put(None)
-def exportar_reporte_BET(main_window, ruta_exportacion, app):
+def exportar_reporte_BET_con_teclas(main_window, ruta_exportacion, app):
     try:
-        # Imprimir detalles de los controles y ventanas hijas de main_window
-        all_controls = main_window.children()
-      #  main_window.print_control_identifiers()
-
-        # Buscar el control por su clase
+        print(" Buscando 'TGraphViewWindow'...")
         graph_view_window = main_window.child_window(class_name="TGraphViewWindow")
 
-        if graph_view_window.exists():
-            print("Componente 'TGraphViewWindow' encontrado.")
-         #   graph_view_window.print_control_identifiers()
-            graph_view_window.right_click_input()
-            time.sleep(1)
-        else:
-            print("No se encontró el componente 'TGraphViewWindow'.")
+        if not graph_view_window.exists(timeout=5):
+            raise Exception(" No se encontró 'TGraphViewWindow'.")
 
-        context_menu = app.window(title_re=".*Context.*")
-        tables_menu_item = context_menu.child_window(title="Tables", control_type="MenuItem")
-        tables_menu_item.click_input()
-        print("Menú 'Tables' seleccionado.")
+        graph_view_window.right_click_input()
+        time.sleep(0.5)
 
-        bet_menu_item = app.window(best_match="Tables").child_window(title="BET", control_type="MenuItem")
-        bet_menu_item.click_input()
-        print("Submenú 'BET' seleccionado.")
+        print(" Enviando teclas: T  B  S  X")
+        send_keys('t')  # Tables
+        time.sleep(0.3)
+        send_keys('b')  # BET
+        time.sleep(0.3)
+        send_keys('s')  # Single Point Surface Area
+        time.sleep(0.3)
+        send_keys('x')  # Export to .CSV
+        print(" Exportación seleccionada vía menú.")
 
-        bet_menu_item = app.window(best_match="BET")
-     #   bet_menu_item.print_control_identifiers(depth=2)
-        single_point_menu_item = bet_menu_item.child_window(title="Single Point Surface Area", control_type="MenuItem")
-        single_point_menu_item.click_input()
-        print("Se seleccionó 'Single Point Surface Area' exitosamente.")
-
-        time.sleep(2)
-        secondary_window2 = app.window(title_re=f".*tab:Single Point Surface Area: file_to_open_nameonly.*")
-        main_window.right_click_input()
-        time.sleep(1)
-
-        savecsv_menu_item = context_menu.child_window(title="Export to .CSV", control_type="MenuItem")
-        savecsv_menu_item.click_input()
-        print("Se seleccionó 'Export to .CSV' exitosamente.")
-
-        time.sleep(2)
+        time.sleep(1.5)
         csv_dialog = app.window(class_name="#32770")
+        csv_dialog.wait("visible", timeout=10)
 
-        print("llegó hasta aquí")
-        ruta_exportacion = generar_nombre_unico(ruta_exportacion,"bet.csv")
-        # Enfocar el cuadro de texto con Alt + M
-        send_keys('%m')  # % representa la tecla Alt en pywinauto
-        time.sleep(2)
-        send_keys(ruta_exportacion)  # % representa la tecla Alt en pywinauto
-        # Esperar hasta que el cuadro de texto esté enfocado
-        edit_box = csv_dialog.child_window(control_type="Edit", found_index=0)
+        ruta_exportacion = generar_nombre_unico(ruta_exportacion, "bet.csv")
 
-        csv_button = csv_dialog.child_window(control_type="Button", title="Guardar") \
-            if csv_dialog.child_window(control_type="Button", title="Guardar").exists() \
-            else csv_dialog.child_window(control_type="Button", title="Save")
-        
-        if csv_button.exists():
-            print("Existe el botón")
-            csv_button.click_input()
-            print("Archivo exportado exitosamente.")
-  
-            return ruta_exportacion
-        else:
-            raise Exception("Botón 'Guardar' no encontrado.")
+        print(f" Ingresando ruta: {ruta_exportacion}")
+        send_keys(ruta_exportacion)
+        time.sleep(0.5)
+        send_keys('%g')  # Alt+G para guardar
+        print(" Alt+G enviado")
 
+        time.sleep(1.5)
+        send_keys('%s')  # Alt+S si ya existe
+        print(" Alt+S enviado (si corresponde)")
+
+        ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
+        print(f" Archivo exportado correctamente: {ruta_relativa}")
+        return ruta_relativa
 
     except Exception as e:
-        print(f"Error durante la exportación: {e}")
-        traceback.print_exc()        
+        print(f" Error durante la exportación BET: {e}")
+        traceback.print_exc()
+        return None
 
 def hilo_leer_csv_y_crear_dataframe(ruta_csv, resultado_dict):
     try:

@@ -39,7 +39,13 @@ def main(ruta_excel,hoja):
     Button(
         ventana,
         text="Manejar NovaWin",
-        command=lambda: manejar_novawin(entry_novawin.get(), entry_qps.get())
+        
+        
+        command=lambda: manejar_novawin(
+        entry_novawin.get(),
+        entry_qps.get(),
+        ruta_excel  # este campo debe existir en tu interfaz
+)
     ).grid(row=4, column=0, pady=20)
 
     def cargar_configuracion():

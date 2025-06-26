@@ -21,6 +21,8 @@ from pandas import ExcelWriter
 import subprocess
 from openpyxl.utils.dataframe import dataframe_to_rows
 
+from openpyxl.utils.dataframe import dataframe_to_rows
+
 def agregar_dataframe_a_nueva_hoja(archivo_excel, dataframe, nombre_hoja):
     # Cargar el archivo Excel existente
     book = load_workbook(archivo_excel)
@@ -211,15 +213,26 @@ def BET_C(df, ruta_excel, Rango_de_Absorpcion, Rango_de_Desorpcion):
     else:
         return False
     # Filtrar los últimos N elementos según el valor de Rango_de_Desorpcion
-def tests_main(archivo_ruta_completa, archivo_csv):
-    print("Inicio de graphs_main")
+import os
+import pandas as pd
+import openpyxl
+from openpyxl.utils.dataframe import dataframe_to_rows
+import matplotlib.pyplot as plt
+import subprocess
+
+def tests_main(archivo_ruta_completa, archivo_excel):
+    print("Inicio de tests_main")
     print(archivo_ruta_completa)
     
     # Crear un DataFrame para almacenar los resultados
     resultados = pd.DataFrame(columns=["Test", "Resultado", "Promedio_A", "Promedio_B", "División"])
 
-    # Leer los datos del archivo CSV
-    df = pd.read_csv(archivo_csv)
+    # Leer la hoja BET del archivo Excel
+    try:
+        df = pd.read_excel(archivo_excel, sheet_name="BET")
+    except Exception as e:
+        print(f"Error al abrir la hoja BET: {e}")
+        return
 
     # Calcular el cambio relativo en la columna 'Relative Pressure'
     df['delta_pressure'] = df['Relative Pressure'].diff()
@@ -244,35 +257,35 @@ def tests_main(archivo_ruta_completa, archivo_csv):
     num_absorcion = len(Rango_de_Absorpcion)
     num_desorcion = len(Rango_de_Desorpcion)
 
-    # Ejecución de los tests (se asume que estas funciones están definidas)
-    resultado_bi = BET_BI(df, archivo_csv, num_absorcion, num_desorcion)
+    # Aquí asumo que estas funciones están definidas en tu código
+    resultado_bi = BET_BI(df, archivo_excel, num_absorcion, num_desorcion)
     if resultado_bi:
          resultados.loc[len(resultados)] = ["BET_BI", "Hay poros cuello de botella", "-", "-", "-"]
     else:
         resultados.loc[len(resultados)] = ["BET_BI", "No hay poros cuello de botella", "-", "-", "-"]
 
-    resultado_p = BET_P(df, archivo_csv, num_absorcion, num_desorcion)
+    resultado_p = BET_P(df, archivo_excel, num_absorcion, num_desorcion)
     if resultado_p:
         resultados.loc[len(resultados)] = ["BET_P", "Hay poros planos", "-", "-", "-"]
     else:
         resultados.loc[len(resultados)] = ["BET_P", "No hay poros planos", "-", "-", "-"]
 
-    resultado_c = BET_C(df, archivo_csv, num_absorcion, num_desorcion)
+    resultado_c = BET_C(df, archivo_excel, num_absorcion, num_desorcion)
     if resultado_c:
         resultados.loc[len(resultados)] = ["BET_C", "Hay poros cilindricos", "-", "-", "-"]
     else:
         resultados.loc[len(resultados)] = ["BET_C", "No hay poros cilindricos", "-", "-", "-"]
 
     # Guardar resultados en una nueva hoja Excel (archivo_planilla.xlsx)
-    archivo_excel = archivo_csv.replace(".csv", ".xlsx")
+    archivo_resultados = archivo_excel.replace(".xlsx", "_resultados.xlsx")
 
     # Crear un nuevo archivo Excel si no existe
-    if not os.path.exists(archivo_excel):
+    if not os.path.exists(archivo_resultados):
         wb = openpyxl.Workbook()
-        wb.save(archivo_excel)
+        wb.save(archivo_resultados)
 
-    # Abrir el archivo Excel
-    wb = openpyxl.load_workbook(archivo_excel)
+    # Abrir el archivo Excel de resultados
+    wb = openpyxl.load_workbook(archivo_resultados)
 
     # Si la hoja ya existe, eliminarla
     if "Resultados Tests" in wb.sheetnames:
@@ -285,7 +298,7 @@ def tests_main(archivo_ruta_completa, archivo_csv):
     for r in dataframe_to_rows(resultados, index=False, header=True):
         ws.append(r)
 
-    wb.save(archivo_excel)
+    wb.save(archivo_resultados)
 
     # Generar gráficos (ejemplo: histograma de 'Volume @ STP')
     plt.hist(df['Volume @ STP'], bins=20, color='blue', alpha=0.7)
@@ -298,7 +311,7 @@ def tests_main(archivo_ruta_completa, archivo_csv):
 
     print("Proceso completado y gráficos generados.")
 
-    # Ejecutar un módulo específico
+    # Ejecutar un módulo específico (ajusta según necesites)
     result = subprocess.run(["python", "-m", "novarep_ide"], capture_output=True, text=True)
     print("Salida estándar:", result.stdout)
     print("Errores estándar:", result.stderr)

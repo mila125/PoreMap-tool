@@ -19,3 +19,6 @@ pip list
 
 python.exe novarep_ide.py
 
+to make .exe
+
+pip install pyinstaller

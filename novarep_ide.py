@@ -8,7 +8,8 @@ from tests import tests_main
 from rangos_dft import rangos_dft_main
 from rectangles import draw_nested_rectangles
 from config_ini import main
-
+from cesarofrac import visualizar_poro_fractal
+from porespy_view import visualizar_poro_con_porespy
 # Archivo de configuración
 config_file = "config.ini"
 
@@ -116,10 +117,19 @@ Button(ventana, text="Visualizar Excel", command=lambda: cargar_archivo(entry_ex
 Button(ventana, text="Visualizar histograma", command=lambda: ejecutar_modulo(graphs_main)).grid(row=5, column=0, pady=10)
 Button(ventana, text="Tests de poros (BET)", command=lambda: ejecutar_modulo(tests_main)).grid(row=5, column=1, pady=10)
 Button(ventana, text="Clasificar poros (DFT)", command=lambda: ejecutar_modulo(rangos_dft_main)).grid(row=5, column=2, pady=10)
-Button(ventana, text="Visualizar árbol", command=lambda: ejecutar_modulo(draw_nested_rectangles)).grid(row=7, column=1, pady=10)
-
+Button(
+    ventana,
+    text="Visualizar poro fractal",
+    command=lambda: ejecutar_modulo(
+        lambda ruta, hoja: visualizar_poro_fractal(ruta, hoja)
+    )
+).grid(row=7, column=1, pady=10)
 Button(ventana, text="Configuracion de inicio", command=lambda: ejecutar_modulo(main)).grid(row=7, column=2, pady=10)
-
+Button(
+    ventana,
+    text="Visualizar poro (porespy)",
+    command=lambda: ejecutar_modulo(lambda ruta, hoja: visualizar_poro_con_porespy(ruta, hoja))
+).grid(row=8, column=1, pady=10)
 
 # Cargar configuración inicial
 def cargar_configuracion():
