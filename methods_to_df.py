@@ -125,14 +125,19 @@ def exportar_reporte_DFT(main_window, ruta_exportacion, app):
         graph_view_window.right_click_input()
         time.sleep(0.5)
 
-        print("Enviando teclas: T → F → P → X")
+        print("Enviando teclas: T  F  P  X")
         send_keys('t')  # Tables
         time.sleep(0.3)
         send_keys('f')  # DFT method
         time.sleep(0.3)
         send_keys('p')  # Pore Size Distribution
         time.sleep(0.3)
-        send_keys('x')  # Export to .CSV
+        
+       # Volver a hacer clic derecho para acceder al menú de exportación
+        graph_view_window.right_click_input()
+        time.sleep(0.5)
+        send_keys('x')  # 'Exportar'
+
         print(" Exportar a CSV solicitado.")
 
         # Esperar a que aparezca el diálogo
@@ -161,7 +166,7 @@ def exportar_reporte_DFT(main_window, ruta_exportacion, app):
         print(f" Error durante la exportación DFT: {e}")
         traceback.print_exc()
         return None
-def exportar_reporte_BJH_con_teclas( main_window, ruta_exportacion, app):
+def exportar_reporte_BJH_con_teclas( main_window, ruta_exportacion, app,tipo):
     """
     Exporta reporte BJH Pore Size Distribution.
     tipo: 'adsorption' o 'desorption'
@@ -181,14 +186,15 @@ def exportar_reporte_BJH_con_teclas( main_window, ruta_exportacion, app):
             time.sleep(0.3)
             send_keys('j')  # BJH Pore Size Distribution
             time.sleep(0.3)
-            send_keys('a')
+            send_keys(tipo)
            
             ruta_exportacion = generar_nombre_unico(ruta_exportacion, "bjhd.csv")
      
 
-            time.sleep(0.3)
-            send_keys('x')  # Export to .CSV
-            print(f" Menú BJH Export seleccionado.")
+            # Volver a hacer clic derecho para acceder al menú de exportación
+            graph_view_window.right_click_input()
+            time.sleep(0.5)
+            send_keys('x')  # 'Exportar'
 
             time.sleep(1.5)
             csv_dialog = app.window(class_name="#32770")
@@ -215,32 +221,34 @@ def exportar_reporte_BJH_con_teclas( main_window, ruta_exportacion, app):
             time.sleep(0.3)
             send_keys('j')  # BJH Pore Size Distribution
             time.sleep(0.3)
-            send_keys('d')
+            send_keys(tipo)
            
             ruta_exportacion = generar_nombre_unico(ruta_exportacion, "bjhd.csv")
      
 
-        time.sleep(0.3)
-        send_keys('x')  # Export to .CSV
-        print(f" Menú BJH → {tipo} → Export seleccionado.")
+            # Volver a hacer clic derecho para acceder al menú de exportación
+            graph_view_window.right_click_input()
+            time.sleep(0.5)
+            send_keys('x')  # 'Exportar'
+            print(f" Menú BJH h  Export seleccionado.")
+ 
+            time.sleep(1.5)
+            csv_dialog = app.window(class_name="#32770")
+            csv_dialog.wait("visible", timeout=10)
 
-        time.sleep(1.5)
-        csv_dialog = app.window(class_name="#32770")
-        csv_dialog.wait("visible", timeout=10)
+            print(" Ingresando ruta y guardando archivo...")
+            send_keys(ruta_exportacion)
+            time.sleep(0.5)
+            send_keys('%g')  # Alt + G para Guardar
+            print(" Alt+G enviado.")
 
-        print(" Ingresando ruta y guardando archivo...")
-        send_keys(ruta_exportacion)
-        time.sleep(0.5)
-        send_keys('%g')  # Alt + G para Guardar
-        print(" Alt+G enviado.")
+            time.sleep(1.5)
+            send_keys('%s')  # Alt + S para Sobrescribir si aparece
+            print(" Alt+S enviado (si es necesario).")
 
-        time.sleep(1.5)
-        send_keys('%s')  # Alt + S para Sobrescribir si aparece
-        print(" Alt+S enviado (si es necesario).")
-
-        ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
-        print(f" Archivo exportado: {ruta_relativa}")
-        return ruta_relativa
+            ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
+            print(f" Archivo exportado: {ruta_relativa}")
+            return ruta_relativa
 
     except Exception as e:
         print(f" Error exportando BJH: {e}")
@@ -273,15 +281,17 @@ def exportar_reporte_fractal_con_teclas(main_window, ruta_exportacion, app,tipo)
         send_keys('n')  # Fractal Dimension Methods
         time.sleep(0.3)
         send_keys(tipo)  # FHH Method Fractal Dimension (Adsorption)
-        time.sleep(0.3)
-        send_keys('h')  # Export to .CSV
-        print(" Menú FHH → Adsorption → Export seleccionado.")
-
+      
+        print(" Menú fractal seleccionado.")
+        # Volver a hacer clic derecho para acceder al menú de exportación
+        graph_view_window.right_click_input()
+        time.sleep(0.5)
+        send_keys('x')  # 'Exportar'
         time.sleep(1.5)
         csv_dialog = app.window(class_name="#32770")
         csv_dialog.wait("visible", timeout=10)
 
-        ruta_exportacion = generar_nombre_unico(ruta_exportacion, "nka.csv")
+        ruta_exportacion = generar_nombre_unico(ruta_exportacion, "fractal.csv")
 
         print(f" Ingresando ruta: {ruta_exportacion}")
         send_keys(ruta_exportacion)
@@ -320,19 +330,21 @@ def exportar_reporte_BET_con_teclas(main_window, ruta_exportacion, app):
         if not graph_view_window.exists(timeout=5):
             raise Exception(" No se encontró 'TGraphViewWindow'.")
 
+        # Click derecho para abrir el menú
         graph_view_window.right_click_input()
         time.sleep(0.5)
 
-        print(" Enviando teclas: T  B  S  X")
-        send_keys('t')  # Tables
+        print(" Enviando teclas :C B S")
+        send_keys('c')  # Tables
         time.sleep(0.3)
         send_keys('b')  # BET
         time.sleep(0.3)
         send_keys('s')  # Single Point Surface Area
-        time.sleep(0.3)
-        send_keys('x')  # Export to .CSV
-        print(" Exportación seleccionada vía menú.")
-
+        print(" Menú BET   Export seleccionado.")
+        # Volver a hacer clic derecho para acceder al menú de exportación
+        graph_view_window.right_click_input()
+        time.sleep(0.5)
+        send_keys('x')  # 'Exportar'
         time.sleep(1.5)
         csv_dialog = app.window(class_name="#32770")
         csv_dialog.wait("visible", timeout=10)
@@ -342,18 +354,21 @@ def exportar_reporte_BET_con_teclas(main_window, ruta_exportacion, app):
         print(f" Ingresando ruta: {ruta_exportacion}")
         send_keys(ruta_exportacion)
         time.sleep(0.5)
-        send_keys('%g')  # Alt+G para guardar
+
+        send_keys('%g')  # Alt + G para guardar
         print(" Alt+G enviado")
 
         time.sleep(1.5)
-        send_keys('%s')  # Alt+S si ya existe
+        send_keys('%s')  # Alt + S para confirmar si ya existe
         print(" Alt+S enviado (si corresponde)")
 
         ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
         print(f" Archivo exportado correctamente: {ruta_relativa}")
+        
         return ruta_relativa
 
     except Exception as e:
+         
         print(f" Error durante la exportación BET: {e}")
         traceback.print_exc()
         return None

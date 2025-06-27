@@ -9,12 +9,13 @@ from pywinauto import Application
 import traceback
 import subprocess
 from pywinauto.keyboard import send_keys
+from datetime import datetime
 def guardar_informe_excel(rutas_csv_dict, ruta_base_exportacion, nombre_base="informe.xlsx"):
     try:
         # Nombre único para el informe
         ruta_excel_final = generar_nombre_unico(ruta_base_exportacion, nombre_base)
 
-        with pd.ExcelWriter(ruta_excel_final, engine='xlsxwriter') as writer:
+        with pd.ExcelWriter(ruta_excel_final, engine='openpyxl') as writer:
             for nombre_hoja, ruta_csv in rutas_csv_dict.items():
                 if ruta_csv and os.path.exists(ruta_csv):
                     try:
@@ -197,22 +198,24 @@ def manejar_novawin(path_novawin, archivo_qps, path_csv_export):
         # 4. Ejecutar exportación (sin hilo)
         ruta_csv_hk = exportar_reporte_HK(main_window, path_csv_export, app)
         ruta_csv_dft = exportar_reporte_DFT(main_window, path_csv_export, app)
-        ruta_csv_bjh = exportar_reporte_BJH_con_teclas(main_window, path_csv_export, app)
+        ruta_csv_bjha = exportar_reporte_BJH_con_teclas(main_window, path_csv_export, app,"a")
+        ruta_csv_bjhd = exportar_reporte_BJH_con_teclas(main_window, path_csv_export, app,"d")
         ruta_csv_fractal_1 = exportar_reporte_fractal_con_teclas(main_window, path_csv_export, app,"n")
         ruta_csv_fractal_2 = exportar_reporte_fractal_con_teclas(main_window, path_csv_export, app,"f")
         ruta_csv_fractal_3 = exportar_reporte_fractal_con_teclas(main_window, path_csv_export, app,"k")
         ruta_csv_fractal_4 = exportar_reporte_fractal_con_teclas(main_window, path_csv_export, app,"h")
-        exportar_reporte_BET_con_teclas(main_window, ruta_exportacion, app)
+        ruta_bet=exportar_reporte_BET_con_teclas(main_window, path_csv_export, app)
         
         rutas_csv = {
         "HK": ruta_csv_hk,
         "DFT": ruta_csv_dft,
-        "BJH": ruta_csv_bjh,
+        "BJHA": ruta_csv_bjha,
+        "BJHD": ruta_csv_bjhd,
         "FRACTAL_n": ruta_csv_fractal_1,
         "FRACTAL_f": ruta_csv_fractal_2,
         "FRACTAL_k": ruta_csv_fractal_3,
         "FRACTAL_h": ruta_csv_fractal_4,
-        "BET": exportar_reporte_BET_con_teclas(main_window, path_csv_export, app)
+        "BET": ruta_bet
          }
 
         guardar_informe_excel(rutas_csv, path_csv_export, "informe.xlsx")
@@ -223,11 +226,7 @@ def manejar_novawin(path_novawin, archivo_qps, path_csv_export):
         # hilo.join()  # Esperar a que termine
         # ruta_csv = q.get()
 
-        if ruta_csv:
-            print(f"Exportación exitosa a CSV: {ruta_csv}")
-        else:
-            print("Exportación fallida o cancelada")
-
+      
         return app, main_window
 
     except Exception as e:

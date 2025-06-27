@@ -159,7 +159,7 @@ def on_hoja_seleccionada(event):
     if ruta_excel and hoja_seleccionada:
         cargar_hoja(ruta_excel, hoja_seleccionada)
 
-combo_hojas.bind("<<ComboboxSelected>>", on_hoja_seleccionada)
+combo_hojas.bind("ComboboxSelected", on_hoja_seleccionada)
 
 ventana.protocol("WM_DELETE_WINDOW", lambda: [guardar_configuracion(), ventana.destroy()])
 
