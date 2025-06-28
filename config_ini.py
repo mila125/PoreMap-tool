@@ -7,15 +7,15 @@ from graphs import graphs_main
 from novawinmng import manejar_novawin
 from tkinter import messagebox
 def main(ruta_excel,hoja):
-    config_file = "startconfig.ini"
+    config_file = "start_config.ini"
     print("Ejecutando configuración con:")
     print("Excel:", ruta_excel)
 
     # Crear ventana principal
     ventana = Tk()
     ventana.title("Selector de Archivo Excel")
-    ventana.geometry("1000x800")
-    ventana.resizable(True, True)  # Permitir que se redimensione
+    ventana.geometry("1200x260")
+    ventana.resizable(False, False)  # Permitir que se redimensione
 
     # === Entrada: Planilla Excel ===
     Label(ventana, text="Ruta del archivo Excel:").grid(row=0, column=0, padx=10, pady=10, sticky="w")

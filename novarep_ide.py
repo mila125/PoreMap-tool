@@ -11,7 +11,7 @@ from config_ini import main
 from cesarofrac import visualizar_poro_fractal
 from porespy_view import visualizar_poro_con_porespy
 # Archivo de configuración
-config_file = "config.ini"
+config_file = "start_config.ini"
 
 # Crear ventana principal
 ventana = Tk()
