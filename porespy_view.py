@@ -23,7 +23,7 @@ def visualizar_poro_con_porespy(ruta_excel, hoja_excel):
         df = pd.read_excel(ruta_excel, sheet_name=hoja_excel)
 
         # Detectar automáticamente la columna de radios o diámetros
-        posibles_columnas = [col for col in df.columns if 'diam' in col.lower() or 'radius' in col.lower()]
+        posibles_columnas = [col for col in df.columns if 'dV()' in col.lower() or 'dV(r)' in col.lower()]
         if not posibles_columnas:
             print(" Columna de radio o diámetro no encontrada.")
             return

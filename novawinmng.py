@@ -170,63 +170,25 @@ def inicializar_novawin(path_novawin):
             print(f"Error con backend '{backend}': {e}")
 
     raise RuntimeError("No se pudo iniciar NovaWin con ninguno de los backends disponibles.")
-
-def manejar_novawin(path_novawin, archivo_qps, path_csv_export):
+def manejar_novawin(path_novawin, archivo_qps):
     try:
         archivo_qps = os.path.normpath(archivo_qps)
 
-        # 1. Iniciar NovaWin
+        # Iniciar NovaWin
         app, main_window = inicializar_novawin(path_novawin)
 
-
-        # 2. Abrir el menú File > Open con teclado
-        print(" Abriendo archivo con Alt+F, luego O...")
-        send_keys('%fo')  # % = Alt, f = File, o = Open
-        time.sleep(1.5)  # Esperar a que se abra el cuadro de diálogo
-
-        # 3. Escribir la ruta del archivo y presionar Alt+A para abrir
-        print(f" Ingresando ruta del archivo: {archivo_qps}")
-        send_keys(archivo_qps)
-        time.sleep(0.5)
-        send_keys('%a')  # Alt + A = Abrir
-        print(" Archivo .QPS enviado y abierto.")
-
-        # 4. Esperar a que se cargue completamente
-        print(" Esperando carga del archivo...")
+        # Abrir archivo desde menú
+        print("Abriendo archivo con Alt+F, luego O...")
+        send_keys('%fo')  # Alt+F > Open
         time.sleep(1.5)
 
-        # 4. Ejecutar exportación (sin hilo)
-        ruta_csv_hk = exportar_reporte_HK(main_window, path_csv_export, app)
-        ruta_csv_dft = exportar_reporte_DFT(main_window, path_csv_export, app)
-        ruta_csv_bjha = exportar_reporte_BJH_con_teclas(main_window, path_csv_export, app,"a")
-        ruta_csv_bjhd = exportar_reporte_BJH_con_teclas(main_window, path_csv_export, app,"d")
-        ruta_csv_fractal_1 = exportar_reporte_fractal_con_teclas(main_window, path_csv_export, app,"n")
-        ruta_csv_fractal_2 = exportar_reporte_fractal_con_teclas(main_window, path_csv_export, app,"f")
-        ruta_csv_fractal_3 = exportar_reporte_fractal_con_teclas(main_window, path_csv_export, app,"k")
-        ruta_csv_fractal_4 = exportar_reporte_fractal_con_teclas(main_window, path_csv_export, app,"h")
-        ruta_bet=exportar_reporte_BET_con_teclas(main_window, path_csv_export, app)
-        
-        rutas_csv = {
-        "HK": ruta_csv_hk,
-        "DFT": ruta_csv_dft,
-        "BJHA": ruta_csv_bjha,
-        "BJHD": ruta_csv_bjhd,
-        "FRACTAL_n": ruta_csv_fractal_1,
-        "FRACTAL_f": ruta_csv_fractal_2,
-        "FRACTAL_k": ruta_csv_fractal_3,
-        "FRACTAL_h": ruta_csv_fractal_4,
-        "BET": ruta_bet
-         }
+        print(f"Ingresando ruta del archivo: {archivo_qps}")
+        send_keys(archivo_qps)
+        time.sleep(0.5)
+        send_keys('%a')  # Alt + A
+        print("Archivo .QPS enviado y abierto.")
+        time.sleep(1.5)  # Esperar carga
 
-        guardar_informe_excel(rutas_csv, path_csv_export, "informe.xlsx")
-        # Si quieres usar hilo (opcional)
-        # q = queue.Queue()
-        # hilo = threading.Thread(target=hilo_exportar_HK, args=(main_window, path_csv_export, app, q))
-        # hilo.start()
-        # hilo.join()  # Esperar a que termine
-        # ruta_csv = q.get()
-
-      
         return app, main_window
 
     except Exception as e:

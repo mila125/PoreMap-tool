@@ -1,0 +1,4 @@
+listar graficos 
+verificar para que sirven izquierda y derecha
+simplificar que haya solo guardar
+regresar a ventana principal

@@ -166,6 +166,20 @@ def exportar_reporte_DFT(main_window, ruta_exportacion, app):
         print(f" Error durante la exportación DFT: {e}")
         traceback.print_exc()
         return None
+def hilo_exportar_reporte_bjh_con_queue(main_window, ruta_exportacion, app, tipo, queue):
+    try:
+        ruta = exportar_reporte_BJH_con_teclas(main_window, ruta_exportacion, app, tipo)
+        queue.put(ruta)
+    except Exception as e:
+        print(f"Error en BJH {tipo}: {e}")
+        queue.put(None)
+def ejecutar_bjh_en_hilo(tipo):
+    hilo = threading.Thread(
+        target=hilo_exportar_reporte_bjh_con_queue,
+        args=(main_window, ruta_exportacion, app, tipo, queue)
+    )
+    hilo.start()
+    return hilo
 def exportar_reporte_BJH_con_teclas( main_window, ruta_exportacion, app,tipo):
     """
     Exporta reporte BJH Pore Size Distribution.
@@ -213,41 +227,7 @@ def exportar_reporte_BJH_con_teclas( main_window, ruta_exportacion, app,tipo):
             ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
             print(f" Archivo exportado: {ruta_relativa}")
         
-            graph_view_window.right_click_input()
-            time.sleep(0.5)
-
-            print(" Enviando secuencia de teclas: T  J  A/D  X")
-            send_keys('t')  # Tables
-            time.sleep(0.3)
-            send_keys('j')  # BJH Pore Size Distribution
-            time.sleep(0.3)
-            send_keys(tipo)
-           
-            ruta_exportacion = generar_nombre_unico(ruta_exportacion, "bjhd.csv")
-     
-
-            # Volver a hacer clic derecho para acceder al menú de exportación
-            graph_view_window.right_click_input()
-            time.sleep(0.5)
-            send_keys('x')  # 'Exportar'
-            print(f" Menú BJH h  Export seleccionado.")
- 
-            time.sleep(1.5)
-            csv_dialog = app.window(class_name="#32770")
-            csv_dialog.wait("visible", timeout=10)
-
-            print(" Ingresando ruta y guardando archivo...")
-            send_keys(ruta_exportacion)
-            time.sleep(0.5)
-            send_keys('%g')  # Alt + G para Guardar
-            print(" Alt+G enviado.")
-
-            time.sleep(1.5)
-            send_keys('%s')  # Alt + S para Sobrescribir si aparece
-            print(" Alt+S enviado (si es necesario).")
-
-            ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
-            print(f" Archivo exportado: {ruta_relativa}")
+          
             return ruta_relativa
 
     except Exception as e:
@@ -255,11 +235,11 @@ def exportar_reporte_BJH_con_teclas( main_window, ruta_exportacion, app,tipo):
         traceback.print_exc()
         return None
 
-def hilo_exportar_FFHA(main_window, path_csv, app,queue):
+def hilo_exportar_reporte_fractal_con_teclas(main_window, path_csv, app,queue):
     try:
-        # Aquí va la lógica para exportar el reporte
-        ruta_csv=exportar_reporte_FFHA(main_window, path_csv, app)
-        queue.put(ruta_csv)  # Almacenar la ruta exportada
+        # Ejecutar la exportación y guardar el resultado en la cola
+        ruta_csv = exportar_reporte_fractal_con_teclas(main_window, ruta_exportacion, app, tipo)
+        queue.put(ruta_csv)
     except Exception as e:
         print(f"Error en la exportación: {e}")
         queue.put(None)
@@ -274,12 +254,13 @@ def exportar_reporte_fractal_con_teclas(main_window, ruta_exportacion, app,tipo)
         # Click derecho para abrir el menú
         graph_view_window.right_click_input()
         time.sleep(0.5)
+        print(" Enviando teclas:T C  N  K  H")
+        send_keys('t')  # Tables
+        time.sleep(0.3)
 
-        print(" Enviando teclas: C  N  K  H")
         send_keys('c')  # Tables
         time.sleep(0.3)
-        send_keys('n')  # Fractal Dimension Methods
-        time.sleep(0.3)
+
         send_keys(tipo)  # FHH Method Fractal Dimension (Adsorption)
       
         print(" Menú fractal seleccionado.")
@@ -334,8 +315,8 @@ def exportar_reporte_BET_con_teclas(main_window, ruta_exportacion, app):
         graph_view_window.right_click_input()
         time.sleep(0.5)
 
-        print(" Enviando teclas :C B S")
-        send_keys('c')  # Tables
+        print(" Enviando teclas :T B S")
+        send_keys('t')  # Tables
         time.sleep(0.3)
         send_keys('b')  # BET
         time.sleep(0.3)
@@ -394,245 +375,87 @@ def hilo_guardar_dataframe_en_ini(df, archivo_ini, resultado_dict):
         resultado_dict['guardado'] = True
     except Exception as e:
         resultado_dict['error'] = f"Error al guardar INI: {e}"
-        
-def df_main(path_qps, path_csv, path_novawin,archivo_planilla):
-    queue = Queue()
-
-    resultado_dict = {}
-
-    archivo_planilla = archivo_planilla.replace("/", "\\")  # Reemplazar barras normales por barras invertidas
-    # Normalizar la ruta del archivo
+def preparar_archivo_excel(path_qps, archivo_planilla):
+    archivo_planilla = archivo_planilla.replace("/", "\\")
     archivo_planilla = os.path.normpath(archivo_planilla)
-
-    print("Inicio de df_main")
-    
-    # Imprimir la ruta completa
-    print(archivo_planilla)
-    # Si el archivo ya existe, eliminarlo
     if os.path.exists(archivo_planilla):
-      os.remove(archivo_planilla)
-      print(f"Archivo '{archivo_planilla}' eliminado.")
- 
-    # Crear el archivo Excel si no existe
+        os.remove(archivo_planilla)
+        print(f"Archivo '{archivo_planilla}' eliminado.")
     if not os.path.exists(archivo_planilla):
-     workbook = Workbook()
-     hoja = workbook.active
-     file_name = os.path.basename(path_qps)
-     hoja["A2"] = "Nombre de la muestra: " + file_name  # Agregar el nombre del archivo en A2
-     workbook.save(archivo_planilla)
-     print(f"Archivo Excel creado en: {archivo_planilla}")
+        workbook = Workbook()
+        hoja = workbook.active
+        hoja["A2"] = "Nombre de la muestra: " + os.path.basename(path_qps)
+        workbook.save(archivo_planilla)
+        print(f"Archivo Excel creado en: {archivo_planilla}")
+    return archivo_planilla
+def exportar_y_guardar(nombre_hoja, funcion_exportacion, path_novawin, path_qps, path_csv, archivo_planilla, resultado_dict):
+    queue = Queue()
+    app, main_window = manejar_novawin(path_novawin, path_qps)
+    hilo = threading.Thread(target=funcion_exportacion, args=(main_window, path_csv, app, queue))
+    hilo.start()
+    hilo.join()
+    ruta_csv = queue.get()
+    close_window_novawin()
+    if ruta_csv:
+        df = leer_csv_y_crear_dataframe(ruta_csv)
+        agregar_dataframe_a_nueva_hoja(archivo_planilla, nombre_hoja, df)
+        resultado_dict[nombre_hoja] = df
     else:
-     print(f"El archivo ya existe en: {archivo_planilla}")
-    
-    try:
-        # Inicializar y manejar NovaWin
-        app, main_window = manejar_novawin(path_novawin, path_qps)
-
-        hilo_exportacion_HK = threading.Thread(target=hilo_exportar_HK, args=(main_window, path_csv, app, queue))
-        hilo_exportacion_HK.start()
-
-        # Esperar a que el hilo termine antes de proceder
-        hilo_exportacion_HK.join()
-
-        # Recuperar la ruta del archivo exportado
-        ruta_csv_HK = queue.get() 
-        if ruta_csv_HK is None:
-           raise ValueError("La exportación no devolvió una ruta válida. Verifica la función exportar_reporte_HK.")
-        close_window_novawin()
-
-        # Crear DataFrame y guardar
-        dataframe = leer_csv_y_crear_dataframe(ruta_csv_HK)
-
-       # Cerrar la ventana de NovaWin
-        close_window_novawin()
-
-        print(dataframe)
-
-
-        # Crear hilos para cada tarea
-        hilo_leer_csv_HK = threading.Thread(target=hilo_leer_csv_y_crear_dataframe, args=(ruta_csv_HK, resultado_dict))
-        hilo_leer_csv_HK.start()
-        hilo_leer_csv_HK.join()
-        agregar_dataframe_a_nueva_hoja(archivo_planilla, "HK", dataframe)
-        
-        # Inicializar y manejar NovaWin nuevamente
-        app, main_window = manejar_novawin(path_novawin, path_qps)
-
-        # Crear un hilo para la exportación (ya no es necesario exportar de nuevo)
-        hilo_exportacion_DFT = threading.Thread(target=hilo_exportar_DFT, args=(main_window, path_csv, app,queue))
-        hilo_exportacion_DFT.start()
-
-        # Esperar a que el hilo termine antes de proceder
-        hilo_exportacion_DFT.join()
-        # Recuperar la ruta del archivo exportado
-        ruta_csv_DFT = queue.get() 
-        if ruta_csv_DFT is None:
-           raise ValueError("La exportación no devolvió una ruta válida. Verifica la función exportar_reporte_DFT.")
-        close_window_novawin()
-
-        # Crear DataFrame y guardar
-        
-        dataframe = leer_csv_y_crear_dataframe(ruta_csv_DFT)
-        print(dataframe)
-        # Crear hilos para cada tarea
-        hilo_leer_csv_DFT = threading.Thread(target=hilo_leer_csv_y_crear_dataframe, args=(ruta_csv_DFT, resultado_dict))
-        hilo_leer_csv_DFT.start()
-        hilo_leer_csv_DFT.join()
-        agregar_dataframe_a_nueva_hoja(archivo_planilla, "DFT", dataframe)
-        
-        # Inicializar y manejar NovaWin nuevamente
-        app, main_window = manejar_novawin(path_novawin, path_qps)
-       
-        # Crear un hilo para la exportación (ya no es necesario exportar de nuevo)
-        hilo_exportacion_BJHD = threading.Thread(target=hilo_exportar_BJHD, args=(main_window, path_csv, app,queue))
-        hilo_exportacion_BJHD.start()
-
-        # Esperar a que el hilo termine antes de proceder
-        hilo_exportacion_BJHD.join()
-        # Recuperar la ruta del archivo exportado
-        ruta_csv_BJHD = queue.get() 
-        if ruta_csv_BJHD is None:
-           raise ValueError("La exportación no devolvió una ruta válida. Verifica la función exportar_reporte_BJHD.")
-        close_window_novawin()
-       
-        # Crear DataFrame y guardar
-        dataframe = leer_csv_y_crear_dataframe(ruta_csv_BJHD)
-        print(dataframe)
-        # Crear hilos para cada tarea
-        hilo_leer_csv_BJHD = threading.Thread(target=hilo_leer_csv_y_crear_dataframe, args=(ruta_csv_BJHD, resultado_dict))
-        hilo_leer_csv_BJHD.start()
-        hilo_leer_csv_BJHD.join()
-        agregar_dataframe_a_nueva_hoja(archivo_planilla, "BJHD", dataframe)
-        
-        # Inicializar y manejar NovaWin nuevamente
-        app, main_window = manejar_novawin(path_novawin, path_qps)
-       
-        # Crear un hilo para la exportación (ya no es necesario exportar de nuevo)
-        hilo_exportacion_BJHA = threading.Thread(target=hilo_exportar_BJHA, args=(main_window, path_csv, app,queue))
-        hilo_exportacion_BJHA.start()
-
-        # Esperar a que el hilo termine antes de proceder
-        hilo_exportacion_BJHA.join()
-
-        ruta_csv_BJHA = queue.get() 
-        if ruta_csv_BJHA is None:
-           raise ValueError("La exportación no devolvió una ruta válida. Verifica la función exportar_reporte_BJHA.")
-        close_window_novawin()
-        # Crear DataFrame y guardar
-        dataframe = leer_csv_y_crear_dataframe(ruta_csv_BJHA)
-        print(dataframe)
-        # Crear hilos para cada tarea
-        hilo_leer_csv_BJHA = threading.Thread(target=hilo_leer_csv_y_crear_dataframe, args=(ruta_csv_BJHA, resultado_dict))
-        hilo_leer_csv_BJHA.start()
-        hilo_leer_csv_BJHA.join()
-        agregar_dataframe_a_nueva_hoja(archivo_planilla, "BJHA", dataframe)
-       
-        #guardar_dataframe_en_ini(dataframe, path_csv+"dataframe.ini")
-        
-          # Inicializar y manejar NovaWin nuevamente
-        app, main_window = manejar_novawin(path_novawin, path_qps)
-    
-        # Crear un hilo para la exportación (ya no es necesario exportar de nuevo)
-        hilo_exportacion_FFHA = threading.Thread(target=hilo_exportar_FFHA, args=(main_window, path_csv, app,queue))
-        hilo_exportacion_FFHA.start()
-
-        # Esperar a que el hilo termine antes de proceder
-        hilo_exportacion_FFHA.join()
-
-        ruta_csv_FFHA = queue.get() 
-        if ruta_csv_FFHA is None:
-           raise ValueError("La exportación no devolvió una ruta válida. Verifica la función exportar_reporte_FFHA.")
-        close_window_novawin()
-        # Crear DataFrame y guardar
-        dataframe = leer_csv_y_crear_dataframe(ruta_csv_FFHA)
-        print(dataframe)
-        # Crear hilos para cada tarea
-        hilo_leer_csv_FFHA = threading.Thread(target=hilo_leer_csv_y_crear_dataframe, args=(ruta_csv_FFHA, resultado_dict))
-        hilo_leer_csv_FFHA.start()
-        hilo_leer_csv_FFHA.join()
-        agregar_dataframe_a_nueva_hoja(archivo_planilla, "FFHA", dataframe)
-        #guardar_dataframe_en_ini(dataframe, path_csv+"dataframe.ini")
-         
-        # Inicializar y manejar NovaWin nuevamente
-        app, main_window = manejar_novawin(path_novawin, path_qps)
-        
-        # Crear un hilo para la exportación (ya no es necesario exportar de nuevo)
-        hilo_exportacion_NKA = threading.Thread(target=hilo_exportar_NKA, args=(main_window, path_csv, app,queue))
-        hilo_exportacion_NKA.start()
-
-        # Esperar a que el hilo termine antes de proceder
-        hilo_exportacion_NKA.join()
-        ruta_csv_NKA = queue.get() 
-        if ruta_csv_NKA is None:
-           raise ValueError("La exportación no devolvió una ruta válida. Verifica la función exportar_reporte_NKA.")
-        close_window_novawin()
-        # Crear DataFrame y guardar
-        dataframe = leer_csv_y_crear_dataframe(ruta_csv_NKA)
-        print(dataframe)
-        # Crear hilos para cada tarea
-        hilo_leer_csv_NKA = threading.Thread(target=hilo_leer_csv_y_crear_dataframe, args=(ruta_csv_NKA, resultado_dict))
-        hilo_leer_csv_NKA.start()
-        hilo_leer_csv_NKA.join()
-        agregar_dataframe_a_nueva_hoja(archivo_planilla, "NKA", dataframe)
-        
-        
-        # Inicializar y manejar NovaWin nuevamente
-        app, main_window = manejar_novawin(path_novawin, path_qps)
-    
-        # Crear un hilo para la exportación (ya no es necesario exportar de nuevo)
-        hilo_exportacion_BET = threading.Thread(target=hilo_exportar_BET, args=(main_window, path_csv, app,queue))
-        hilo_exportacion_BET.start()
-
-        # Esperar a que el hilo termine antes de proceder
-        hilo_exportacion_BET.join()
-        ruta_csv_BET = queue.get() 
-        if ruta_csv_BET is None:
-           raise ValueError("La exportación no devolvió una ruta válida. Verifica la función exportar_reporte_BET.")
-        close_window_novawin()
-        # Crear DataFrame y guardar
-        dataframe = leer_csv_y_crear_dataframe(ruta_csv_BET)
-        
-        print(dataframe)
-        # Crear hilos para cada tarea
-        hilo_leer_csv_BET = threading.Thread(target=hilo_leer_csv_y_crear_dataframe, args=(ruta_csv_BET, resultado_dict))
-        hilo_leer_csv_BET.start()
-        hilo_leer_csv_BET.join()
-        agregar_dataframe_a_nueva_hoja(archivo_planilla, "BET", dataframe)
-        
-        #guardar_dataframe_en_ini(dataframe, path_csv+"dataframe.ini")      
-
-        print("Proceso completado exitosamente.")
-        
-        # Crear hilos para cada tarea
-        #hilo_leer_csv = threading.Thread(target=hilo_leer_csv_y_crear_dataframe, args=(ruta_csv, resultado_dict))
-        hilo_agregar_excel = threading.Thread(target=hilo_agregar_csv_a_plantilla_excel, args=(ruta_csv, path_csv, resultado_dict))
-        hilo_guardar_ini = threading.Thread(target=hilo_guardar_dataframe_en_ini, args=(resultado_dict.get('dataframe', None), path_csv + "dataframe.ini", resultado_dict))
-
-        # Iniciar hilos
-        hilo_leer_csv.start()
-        hilo_agregar_excel.start()
+        raise ValueError(f"Exportación fallida para {nombre_hoja}")
+def exportar_y_guardar_fractal(tipo, hoja, path_novawin, path_qps, path_csv, archivo_planilla, resultado_dict):
+    queue = Queue()
+    app, main_window = manejar_novawin(path_novawin, path_qps)
+    hilo = threading.Thread(target=hilo_exportar_reporte_fractal_con_teclas,
+                            args=(main_window, path_csv, app, tipo, queue))
+    hilo.start()
+    hilo.join()
+    ruta_csv = queue.get()
+    close_window_novawin()
+    if ruta_csv:
+        hilo_excel = threading.Thread(target=hilo_agregar_csv_to_plantilla_excel,
+                                      args=(ruta_csv, archivo_planilla, resultado_dict, hoja))
+        hilo_excel.start()
+        hilo_excel.join()
+    else:
+        raise ValueError(f"Exportación fractal '{tipo}' fallida")
+def guardar_final(path_csv, resultado_dict):
+    df = resultado_dict.get("HK") or list(resultado_dict.values())[0]
+    if df is not None:
+        hilo_guardar_ini = threading.Thread(target=hilo_guardar_dataframe_en_ini,
+                                            args=(df, os.path.join(path_csv, "dataframe.ini"), resultado_dict))
         hilo_guardar_ini.start()
-
-        # Esperar a que todos los hilos terminen
-        hilo_leer_csv.join()
-        hilo_agregar_excel.join()
         hilo_guardar_ini.join()
+def ejecutar_en_hebra(funcion):
+    hebra = threading.Thread(target=funcion)
+    hebra.start()
+    hebra.join()
+    print("Comando ejecutado en hebra.")
+    
+def df_main(path_qps, path_csv, path_novawin, archivo_planilla):
+    try:
+        archivo_planilla = preparar_archivo_excel(path_qps, archivo_planilla)
+        resultado_dict = {}
 
-        # Verificar errores o resultados en el diccionario
-        if 'error' in resultado_dict:
-            print(f"Error: {resultado_dict['error']}")
-        else:
-            print("Todas las tareas completadas exitosamente.")
+        # Bloques de exportación
+        exportar_y_guardar('HK', hilo_exportar_HK, path_novawin, path_qps, path_csv, archivo_planilla, resultado_dict)
+        exportar_y_guardar('DFT', hilo_exportar_DFT, path_novawin, path_qps, path_csv, archivo_planilla, resultado_dict)
+        exportar_y_guardar('BJHD', lambda *args: ejecutar_bjh_en_hilo('d'), path_novawin, path_qps, path_csv, archivo_planilla, resultado_dict)
+        exportar_y_guardar('BJHA', lambda *args: ejecutar_bjh_en_hilo('a'), path_novawin, path_qps, path_csv, archivo_planilla, resultado_dict)
 
-        # Continuar con otras tareas si es necesario
+        # Fractales
+        tipos_fractales = {'n': 'Fractal_N', 'f': 'Fractal_F', 'k': 'Fractal_K', 'h': 'Fractal_H'}
+        for tipo, hoja in tipos_fractales.items():
+            exportar_y_guardar_fractal(tipo, hoja, path_novawin, path_qps, path_csv, archivo_planilla, resultado_dict)
+
+        # BET
+        exportar_y_guardar('BET', hilo_exportar_BET, path_novawin, path_qps, path_csv, archivo_planilla, resultado_dict)
+
+        # Guardar .ini y Excel final
+        guardar_final(path_csv, resultado_dict)
+
         print("Proceso completado exitosamente.")
-        # Ejecutar un módulo específico
-        # Crear y ejecutar la hebra
-        hebra = threading.Thread(target=ejecutar_ide)
-        hebra.start()
+        ejecutar_en_hebra(ejecutar_ide)
 
-        print("El comando se está ejecutando en una hebra separada.")
-        hebra.join()
     except Exception as e:
         print(f"Error en df_main: {e}")
         traceback.print_exc()

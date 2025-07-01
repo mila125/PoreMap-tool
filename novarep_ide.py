@@ -11,13 +11,13 @@ from config_ini import main
 from cesarofrac import visualizar_poro_fractal
 from porespy_view import visualizar_poro_con_porespy
 # Archivo de configuración
-config_file = "start_config.ini"
+config_file = "config.ini"
 
 # Crear ventana principal
 ventana = Tk()
 ventana.title("Selector de Archivo Excel")
 ventana.geometry("1000x800")
-ventana.resizable(True, True)  # Permitir que se redimensione
+ventana.resizable(False, False)  # Permitir que se redimensione
 
 # Etiqueta y campo de entrada para archivo Excel
 Label(ventana, text="Ruta del archivo Excel:").grid(row=0, column=0, padx=10, pady=10, sticky="w")
@@ -114,7 +114,7 @@ def ejecutar_modulo(funcion):
 # Visualizar Excel (va en row=2 debajo del selector de archivo)
 Button(ventana, text="Visualizar Excel", command=lambda: cargar_archivo(entry_excel.get())).grid(row=2, column=0, columnspan=3, pady=10)
 # Botones de acciones (bajan a row=5)
-Button(ventana, text="Visualizar histograma", command=lambda: ejecutar_modulo(graphs_main)).grid(row=5, column=0, pady=10)
+Button(ventana, text="Visualizar histogrcfama", command=lambda: ejecutar_modulo(graphs_main)).grid(row=5, column=0, pady=10)
 Button(ventana, text="Tests de poros (BET)", command=lambda: ejecutar_modulo(tests_main)).grid(row=5, column=1, pady=10)
 Button(ventana, text="Clasificar poros (DFT)", command=lambda: ejecutar_modulo(rangos_dft_main)).grid(row=5, column=2, pady=10)
 Button(
