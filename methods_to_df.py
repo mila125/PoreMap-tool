@@ -4,15 +4,16 @@ import csv
 import traceback
 from datetime import datetime
 from pywinauto import Application, findwindows
-
+import pandas as pd
 import time
 import threading
-#from novawinmng import manejar_novawin, leer_csv_y_crear_dataframe,agregar_csv_a_plantilla_excel, guardar_dataframe_en_ini,generar_nombre_unico,agregar_dataframe_a_excel_sin_borrar,agregar_dataframe_a_nueva_hoja,close_window_novawin
+# manejar_novawin, leer_csv_y_crear_dataframe,agregar_csv_a_plantilla_excel, guardar_dataframe_en_ini,generar_nombre_unico,agregar_dataframe_a_excel_sin_borrar,agregar_dataframe_a_nueva_hoja,close_window_novawin
 from pywinauto.keyboard import send_keys
 from openpyxl import Workbook
 # ejecutor.py
 import subprocess
 from queue import Queue
+import queue
 def generar_nombre_unico(base_path, namext):
     # Normalizar las barras a formato Unix (/)
     base_path = base_path.replace("\\", "/")
@@ -95,10 +96,7 @@ def exportar_reporte_HK(main_window, ruta_exportacion, app):
         return ruta_relativa
        
 
-        print("Archivo exportado exitosamente.")
-        ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
-        print(f"Archivo exportado en: {ruta_relativa}")
-        return ruta_relativa
+
 
     except Exception as e:
         print(f"Error durante la exportación: {e}")
@@ -133,30 +131,29 @@ def exportar_reporte_DFT(main_window, ruta_exportacion, app):
         send_keys('p')  # Pore Size Distribution
         time.sleep(0.3)
         
-       # Volver a hacer clic derecho para acceder al menú de exportación
+        # Volver a hacer clic derecho para acceder al menú de exportación
         graph_view_window.right_click_input()
         time.sleep(0.5)
-        send_keys('x')  # 'Exportar'
-
-        print(" Exportar a CSV solicitado.")
-
-        # Esperar a que aparezca el diálogo
-        time.sleep(1.5)
+        send_keys('x')  # 'Pore Size Distribution'
+        time.sleep(1)
         csv_dialog = app.window(class_name="#32770")
         csv_dialog.wait("visible ready", timeout=10)
+        print("Diálogo de guardado encontrado.")
 
         ruta_exportacion = generar_nombre_unico(ruta_exportacion, "dft.csv")
-        print(f" Ingresando ruta: {ruta_exportacion}")
+
+        send_keys('%m')
+        time.sleep(1)
         send_keys(ruta_exportacion)
         time.sleep(0.5)
-
         send_keys('%g')  # Alt + G para guardar
         print(" Presionado Alt+G")
 
-        # Posible diálogo de sobrescritura
+        # Esperar posible diálogo de sobrescritura (max 2 seg)
         time.sleep(1.5)
-        send_keys('%s')  # Alt + S para confirmar sobrescritura
-        print(" Alt+S enviado por si hay confirmación.")
+        print(" Intentando confirmar sobrescritura con Alt+S...")
+        send_keys('%s')  # Alt + S para confirmar "Sí, sobrescribir"
+        print(" Si apareció el diálogo, fue confirmado con Alt+S.") 
 
         ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
         print(f" Archivo DFT exportado en: {ruta_relativa}")
@@ -166,69 +163,51 @@ def exportar_reporte_DFT(main_window, ruta_exportacion, app):
         print(f" Error durante la exportación DFT: {e}")
         traceback.print_exc()
         return None
-def hilo_exportar_reporte_bjh_con_queue(main_window, ruta_exportacion, app, tipo, queue):
-    try:
-        ruta = exportar_reporte_BJH_con_teclas(main_window, ruta_exportacion, app, tipo)
-        queue.put(ruta)
-    except Exception as e:
-        print(f"Error en BJH {tipo}: {e}")
-        queue.put(None)
-def ejecutar_bjh_en_hilo(tipo):
-    hilo = threading.Thread(
-        target=hilo_exportar_reporte_bjh_con_queue,
-        args=(main_window, ruta_exportacion, app, tipo, queue)
-    )
-    hilo.start()
-    return hilo
+ 
 def exportar_reporte_BJH_con_teclas( main_window, ruta_exportacion, app,tipo):
-    """
-    Exporta reporte BJH Pore Size Distribution.
-    tipo: 'adsorption' o 'desorption'
-    """
     try:
-        print(" Buscando 'TGraphViewWindow'...")
+        print(" Buscando componente 'TGraphViewWindow'...")
         graph_view_window = main_window.child_window(class_name="TGraphViewWindow")
 
         if not graph_view_window.exists(timeout=5):
             raise Exception(" No se encontró 'TGraphViewWindow'.")
 
-            graph_view_window.right_click_input()
-            time.sleep(0.5)
+        print(" Componente encontrado. Clic derecho para menú.")
+        graph_view_window.right_click_input()
+        time.sleep(0.5)
 
-            print(" Enviando secuencia de teclas: T  J  A/D  X")
-            send_keys('t')  # Tables
-            time.sleep(0.3)
-            send_keys('j')  # BJH Pore Size Distribution
-            time.sleep(0.3)
-            send_keys(tipo)
+        print("Enviando teclas: T  F  P  X")
+        send_keys('t')  # Tables
+        time.sleep(0.3)
+        send_keys('j')  # BJH Pore Size Distribution
+        time.sleep(0.3)
+        send_keys(tipo)
            
-            ruta_exportacion = generar_nombre_unico(ruta_exportacion, "bjhd.csv")
+        ruta_exportacion = generar_nombre_unico(ruta_exportacion, "bjhd.csv")
      
 
-            # Volver a hacer clic derecho para acceder al menú de exportación
-            graph_view_window.right_click_input()
-            time.sleep(0.5)
-            send_keys('x')  # 'Exportar'
+      # Volver a hacer clic derecho para acceder al menú de exportación
+        graph_view_window.right_click_input()
+        time.sleep(0.5)
+        send_keys('x')  # 'Exportar'
+        ruta_exportacion = generar_nombre_unico(ruta_exportacion, tipo+"bjh.csv")
 
-            time.sleep(1.5)
-            csv_dialog = app.window(class_name="#32770")
-            csv_dialog.wait("visible", timeout=10)
+        send_keys('%m')
+        time.sleep(1)
+        send_keys(ruta_exportacion)
+        time.sleep(0.5)
+        send_keys('%g')  # Alt + G para guardar
+        print(" Presionado Alt+G")
 
-            print(" Ingresando ruta y guardando archivo...")
-            send_keys(ruta_exportacion)
-            time.sleep(0.5)
-            send_keys('%g')  # Alt + G para Guardar
-            print(" Alt+G enviado.")
+        # Esperar posible diálogo de sobrescritura (max 2 seg)
+        time.sleep(1.5)
+        print(" Intentando confirmar sobrescritura con Alt+S...")
+        send_keys('%s')  # Alt + S para confirmar "Sí, sobrescribir"
+        print(" Si apareció el diálogo, fue confirmado con Alt+S.") 
 
-            time.sleep(1.5)
-            send_keys('%s')  # Alt + S para Sobrescribir si aparece
-            print(" Alt+S enviado (si es necesario).")
-
-            ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
-            print(f" Archivo exportado: {ruta_relativa}")
-        
-          
-            return ruta_relativa
+        ruta_relativa = os.path.relpath(ruta_exportacion, start=os.getcwd())
+        print(f" Archivo DFT exportado en: {ruta_relativa}")
+        return ruta_relativa
 
     except Exception as e:
         print(f" Error exportando BJH: {e}")
@@ -369,6 +348,7 @@ def hilo_agregar_csv_a_plantilla_excel(ruta_csv, ruta_excel, resultado_dict):
         resultado_dict['error'] = f"Error al agregar datos del CSV a Excel: {e}"
 
 # Función para guardar el DataFrame en un archivo INI en un hilo
+# Función para guardar el DataFrame en un archivo INI en un hilo
 def hilo_guardar_dataframe_en_ini(df, archivo_ini, resultado_dict):
     try:
         guardar_dataframe_en_ini(df, archivo_ini)
@@ -388,20 +368,7 @@ def preparar_archivo_excel(path_qps, archivo_planilla):
         workbook.save(archivo_planilla)
         print(f"Archivo Excel creado en: {archivo_planilla}")
     return archivo_planilla
-def exportar_y_guardar(nombre_hoja, funcion_exportacion, path_novawin, path_qps, path_csv, archivo_planilla, resultado_dict):
-    queue = Queue()
-    app, main_window = manejar_novawin(path_novawin, path_qps)
-    hilo = threading.Thread(target=funcion_exportacion, args=(main_window, path_csv, app, queue))
-    hilo.start()
-    hilo.join()
-    ruta_csv = queue.get()
-    close_window_novawin()
-    if ruta_csv:
-        df = leer_csv_y_crear_dataframe(ruta_csv)
-        agregar_dataframe_a_nueva_hoja(archivo_planilla, nombre_hoja, df)
-        resultado_dict[nombre_hoja] = df
-    else:
-        raise ValueError(f"Exportación fallida para {nombre_hoja}")
+
 def exportar_y_guardar_fractal(tipo, hoja, path_novawin, path_qps, path_csv, archivo_planilla, resultado_dict):
     queue = Queue()
     app, main_window = manejar_novawin(path_novawin, path_qps)

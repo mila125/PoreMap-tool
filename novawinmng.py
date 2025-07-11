@@ -1,6 +1,6 @@
 from pywinauto import Application
 import time
-from methods_to_df import exportar_reporte_HK,exportar_reporte_DFT,exportar_reporte_BJH_con_teclas,exportar_reporte_fractal_con_teclas,exportar_reporte_BET_con_teclas
+from methods_to_df import  preparar_archivo_excel,df_main,exportar_reporte_HK,exportar_reporte_DFT,exportar_reporte_BJH_con_teclas,exportar_reporte_fractal_con_teclas,exportar_reporte_BET_con_teclas
 import os
 import pandas as pd
 import configparser
@@ -10,6 +10,25 @@ import traceback
 import subprocess
 from pywinauto.keyboard import send_keys
 from datetime import datetime
+from queue import Queue
+import queue
+def exportar_y_guardar(nombre_hoja, funcion_exportacion, path_novawin, path_qps, path_csv, archivo_planilla, resultado_dict):
+    queue = Queue()
+    app, main_window = manejar_novawin(path_qps,
+            archivo_planilla ,
+            path_novawin,
+            archivo_planilla)
+    hilo = threading.Thread(target=funcion_exportacion, args=(main_window, path_csv, app, queue))
+    hilo.start()
+    hilo.join()
+    ruta_csv = queue.get()
+    close_window_novawin()
+    if ruta_csv:
+        df = leer_csv_y_crear_dataframe(ruta_csv)
+        agregar_dataframe_a_nueva_hoja(archivo_planilla, nombre_hoja, df)
+        resultado_dict[nombre_hoja] = df
+    else:
+        raise ValueError(f"Exportación fallida para {nombre_hoja}")
 def guardar_informe_excel(rutas_csv_dict, ruta_base_exportacion, nombre_base="informe.xlsx"):
     try:
         # Nombre único para el informe
@@ -170,32 +189,74 @@ def inicializar_novawin(path_novawin):
             print(f"Error con backend '{backend}': {e}")
 
     raise RuntimeError("No se pudo iniciar NovaWin con ninguno de los backends disponibles.")
-def manejar_novawin(path_novawin, archivo_qps):
+def crear_excel_con_hojas(csv_dict, ruta_excel_final):#usar esta ahora
+    """
+    Crea un archivo Excel donde cada hoja corresponde al contenido de un CSV.
+
+    :param csv_dict: Diccionario con claves como nombre de hoja y valores como path del CSV
+    :param ruta_excel_final: Ruta donde guardar el archivo .xlsx final
+    """
+    with pd.ExcelWriter(ruta_excel_final, engine='openpyxl') as writer:
+        for hoja, path_csv in csv_dict.items():
+            try:
+                df = pd.read_csv(path_csv)
+                df.to_excel(writer, sheet_name=hoja, index=False)
+                print(f"✔ Hoja '{hoja}' agregada con éxito desde {path_csv}")
+            except Exception as e:
+                print(f"❌ Error al procesar {hoja} ({path_csv}): {e}")
+def manejar_novawin(path_qps, path_csv, path_novawin, archivo_planilla):
     try:
-        archivo_qps = os.path.normpath(archivo_qps)
+        path_qps = os.path.normpath(path_qps)
+        path_csv = os.path.normpath(path_csv)
+        archivo_planilla = os.path.normpath(archivo_planilla)
 
         # Iniciar NovaWin
+        print("Iniciando NovaWin...")
         app, main_window = inicializar_novawin(path_novawin)
+        time.sleep(2)
 
-        # Abrir archivo desde menú
-        print("Abriendo archivo con Alt+F, luego O...")
+        # Abrir archivo .QPS desde el menú
+        print("Abriendo archivo .QPS con Alt+F, luego O...")
         send_keys('%fo')  # Alt+F > Open
         time.sleep(1.5)
 
-        print(f"Ingresando ruta del archivo: {archivo_qps}")
-        send_keys(archivo_qps)
+        print(f"Ingresando ruta del archivo QPS: {path_qps}")
+        send_keys(path_qps)
         time.sleep(0.5)
-        send_keys('%a')  # Alt + A
+        send_keys('%a')  # Alt + A (Aceptar)
         print("Archivo .QPS enviado y abierto.")
-        time.sleep(1.5)  # Esperar carga
+        time.sleep(2)
+        path_csv_hk=exportar_reporte_HK(main_window,archivo_planilla, app)
+        path_csv_dft=exportar_reporte_DFT(main_window,archivo_planilla, app)
+        path_csv_bjha=exportar_reporte_BJH_con_teclas( main_window,archivo_planilla, app,"a")
+        path_csv_bjhd=exportar_reporte_BJH_con_teclas( main_window,archivo_planilla, app,"d")
+        path_csv_n=exportar_reporte_fractal_con_teclas(main_window,archivo_planilla, app,'n')
+        path_csv_f=exportar_reporte_fractal_con_teclas(main_window,archivo_planilla, app,'f')
+        path_csv_k=exportar_reporte_fractal_con_teclas(main_window,archivo_planilla, app,'k')
+        path_csv_h=exportar_reporte_fractal_con_teclas(main_window,archivo_planilla, app,'h')
+        path_csv_bet=exportar_reporte_BET_con_teclas(main_window,archivo_planilla, app)
+        archivo_planilla = preparar_archivo_excel(path_qps, archivo_planilla)
+     
+        csv_hojas = {
+        "HK": path_csv_hk,
+        "DFT": path_csv_dft,
+        "BJHA": path_csv_bjha,
+        "BJHD": path_csv_bjhd,
+        "N": path_csv_n,
+        "F": path_csv_f,
+        "K": path_csv_k,
+        "H": path_csv_h,
+        "BET": path_csv_bet,
+         }
 
-        return app, main_window
+        crear_excel_con_hojas(csv_hojas, "exportacion_completa.xlsx")
+
+        print("Proceso completado exitosamente.")
+        ejecutar_en_hebra(ejecutar_ide)
+
 
     except Exception as e:
         print(f"Error al manejar NovaWin: {e}")
-        traceback.print_exc()
-        raise
-
 def seleccionar_menu(window, ruta_menu):
     try:
         print(f"Seleccionando menú: {ruta_menu}")
