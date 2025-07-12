@@ -2,53 +2,75 @@ from tkinter import Tk, Label, Button, Entry, filedialog, Frame, Scrollbar, VERT
 from tkinter import ttk
 import configparser
 import pandas as pd
-import threading
-from graphs import graphs_main
-from tests import tests_main
-from rangos_dft import rangos_dft_main
-from rectangles import draw_nested_rectangles
-from config_ini import main
-from cesarofrac import visualizar_poro_fractal
-from porespy_view import visualizar_poro_con_porespy
-# Archivo de configuración
+from config_ini import main as config_main
+import subprocess
+
 config_file = "config.ini"
 
-# Crear ventana principal
 ventana = Tk()
 ventana.title("Selector de Archivo Excel")
-ventana.geometry("1000x800")
-ventana.resizable(False, False)  # Permitir que se redimensione
-
-# Etiqueta y campo de entrada para archivo Excel
+ventana.geometry("600x600")
+ventana.resizable(False, False)
+# --- Estado ---
+label_estado = Label(ventana, text="", fg="blue", font=("Arial", 10))
+label_estado.grid(row=2, column=1, columnspan=2, pady=5, sticky="w")
+# --- Ruta archivo Excel ---
 Label(ventana, text="Ruta del archivo Excel:").grid(row=0, column=0, padx=10, pady=10, sticky="w")
 entry_excel = Entry(ventana, width=50)
 entry_excel.grid(row=0, column=1, padx=10, pady=10)
-
-# Función para seleccionar archivo Excel
+def abrir_config_ini():
+    ruta_carpeta = entry_carpeta.get()
+    if not ruta_carpeta:
+        label_estado.config(text="Por favor, selecciona una carpeta primero")
+        return
+    try:
+     config_main(ruta_carpeta)
+     print("Módulo configuración abierto correctamente")
+     ventana.destroy()
+    except Exception as e:
+     print(f"Error al abrir módulo: {e}")
+     try:
+        label_estado.config(text=f"Error: {e}")
+     except:
+        pass
 def seleccionar_archivo():
-    archivo_seleccionado = filedialog.askopenfilename(filetypes=[("Archivos XLSX", "*.xlsx")])
-    if archivo_seleccionado:
-        entry_excel.delete(0, "end")
-        entry_excel.insert(0, archivo_seleccionado)
 
-# Selección de archivo (ya está en row=0)
+    ventana.geometry("1000x600")        # Cambia el tamaño
+    ventana.update_idletasks()          # Fuerza la actualización visual
+    ventana.resizable(False, False)     # Opcional: evitar que el usuario redimensione
+    archivo = filedialog.askopenfilename(filetypes=[("Archivos XLSX", "*.xlsx")])
+    if archivo:
+        
+        entry_excel.delete(0, 'end')
+        entry_excel.insert(0, archivo)
+
 Button(ventana, text="Seleccionar archivo", command=seleccionar_archivo).grid(row=0, column=2, padx=10, pady=10)
 
+# --- Ruta carpeta ---
+Label(ventana, text="Ruta de carpeta:").grid(row=1, column=0, padx=10, pady=10, sticky="w")
+entry_carpeta = Entry(ventana, width=50)
+entry_carpeta.grid(row=1, column=1, padx=10, pady=10)
 
-# Estado
-label_estado = Label(ventana, text="", fg="blue", font=("Arial", 10))
-label_estado.grid(row=1, column=1, columnspan=2, pady=5, sticky="w")
+def seleccionar_carpeta():
+    carpeta = filedialog.askdirectory(title="Selecciona carpeta")
+    if carpeta:
+        entry_carpeta.delete(0, 'end')
+        entry_carpeta.insert(0, carpeta)
 
-# Combobox para seleccionar hoja
-Label(ventana, text="Selecciona hoja:").grid(row=2, column=0, padx=10, pady=10, sticky="w")
+Button(ventana, text="Seleccionar carpeta", command=seleccionar_carpeta).grid(row=1, column=2, padx=10, pady=10)
+
+
+
+# --- Selección de hoja ---
+Label(ventana, text="Selecciona hoja:").grid(row=3, column=0, padx=10, pady=10, sticky="w")
 combo_hojas = ttk.Combobox(ventana, state="readonly")
-combo_hojas.grid(row=3, column=1, padx=10, pady=10, sticky="w")
-
-# Ocultar el combo y la tabla inicialmente
+combo_hojas.grid(row=4, column=1, padx=10, pady=10, sticky="w")
 combo_hojas.grid_forget()
+
+# --- Frame para tabla ---
 frame_tabla = Frame(ventana, width=960, height=600)
-frame_tabla.grid(row=3, column=0, columnspan=3, padx=10, pady=10)
-frame_tabla.grid_forget()  # Inicialmente oculto
+frame_tabla.grid(row=4, column=0, columnspan=3, padx=10, pady=10)
+frame_tabla.grid_forget()
 
 scrollbar_y = Scrollbar(frame_tabla, orient=VERTICAL)
 scrollbar_y.pack(side=RIGHT, fill=Y)
@@ -61,35 +83,30 @@ tree.pack(expand=True, fill=BOTH)
 scrollbar_y.config(command=tree.yview)
 scrollbar_x.config(command=tree.xview)
 
-# Función para mostrar DataFrame
 def mostrar_dataframe(df):
-    # Hacer visibles el combo y el treeview
-    combo_hojas.grid(row=2, column=1, padx=10, pady=10, sticky="w")
-    frame_tabla.grid(row=3, column=0, columnspan=3, padx=10, pady=10)
+    combo_hojas.grid(row=3, column=1, padx=10, pady=10, sticky="w")
+    frame_tabla.grid(row=4, column=0, columnspan=3, padx=10, pady=10)
 
     tree.delete(*tree.get_children())
     tree["columns"] = list(df.columns)
     tree["show"] = "headings"
-    
-    # Establecer las columnas con un ancho fijo total
+
     ancho_fijo = 1000
-    column_width = ancho_fijo // len(df.columns)  # Dividir el ancho entre el número de columnas
-    
-    # Establecer el ancho de cada columna
+    column_width = ancho_fijo // len(df.columns)
+
     for col in df.columns:
         tree.heading(col, text=col)
         tree.column(col, anchor="center", width=column_width)
-    
-    # Insertar los datos en el Treeview
+
     for _, row in df.iterrows():
         tree.insert("", "end", values=list(row))
 
-def cargar_archivo(ruta_excel):
+def cargar_archivo():
+    ruta_excel = entry_excel.get()
     if not ruta_excel:
         label_estado.config(text="Por favor, proporciona la ruta del archivo Excel")
         return
     try:
-        # Leer solo nombres de hojas
         hojas = pd.ExcelFile(ruta_excel).sheet_names
         combo_hojas["values"] = hojas
         if hojas:
@@ -98,52 +115,6 @@ def cargar_archivo(ruta_excel):
         label_estado.config(text="Archivo cargado correctamente")
     except Exception as e:
         label_estado.config(text=f"Error: {e}")
-
-# Función para ejecutar módulos
-def ejecutar_modulo(funcion):
-    ruta_excel = entry_excel.get()
-    hoja_seleccionada = combo_hojas.get()
-    if not ruta_excel:
-        label_estado.config(text="Selecciona un archivo Excel")
-        return
-    print(f"Ejecutando {funcion.__name__} con Excel: {ruta_excel} y hoja: {hoja_seleccionada}")
-    ventana.quit()
-    ventana.destroy()
-    funcion(ruta_excel, hoja_seleccionada)  # PASA LA HOJA
-
-# Visualizar Excel (va en row=2 debajo del selector de archivo)
-Button(ventana, text="Visualizar Excel", command=lambda: cargar_archivo(entry_excel.get())).grid(row=2, column=0, columnspan=3, pady=10)
-# Botones de acciones (bajan a row=5)
-Button(ventana, text="Visualizar histogrcfama", command=lambda: ejecutar_modulo(graphs_main)).grid(row=5, column=0, pady=10)
-Button(ventana, text="Tests de poros (BET)", command=lambda: ejecutar_modulo(tests_main)).grid(row=5, column=1, pady=10)
-Button(ventana, text="Clasificar poros (DFT)", command=lambda: ejecutar_modulo(rangos_dft_main)).grid(row=5, column=2, pady=10)
-Button(
-    ventana,
-    text="Visualizar poro fractal",
-    command=lambda: ejecutar_modulo(
-        lambda ruta, hoja: visualizar_poro_fractal(ruta, hoja)
-    )
-).grid(row=7, column=1, pady=10)
-Button(ventana, text="Configuracion de inicio", command=lambda: ejecutar_modulo(main)).grid(row=7, column=2, pady=10)
-Button(
-    ventana,
-    text="Visualizar poro (porespy)",
-    command=lambda: ejecutar_modulo(lambda ruta, hoja: visualizar_poro_con_porespy(ruta, hoja))
-).grid(row=8, column=1, pady=10)
-
-# Cargar configuración inicial
-def cargar_configuracion():
-    config = configparser.ConfigParser()
-    config.read(config_file)
-    if "Rutas" in config:
-        entry_excel.insert(0, config["Rutas"].get("ruta_excel", ""))
-
-# Guardar configuración al cerrar
-def guardar_configuracion():
-    config = configparser.ConfigParser()
-    config["Rutas"] = {"ruta_excel": entry_excel.get()}
-    with open(config_file, "w") as configfile:
-        config.write(configfile)
 
 def cargar_hoja(ruta_excel, hoja):
     try:
@@ -155,15 +126,38 @@ def cargar_hoja(ruta_excel, hoja):
 
 def on_hoja_seleccionada(event):
     ruta_excel = entry_excel.get()
-    hoja_seleccionada = combo_hojas.get()
-    if ruta_excel and hoja_seleccionada:
-        cargar_hoja(ruta_excel, hoja_seleccionada)
+    hoja = combo_hojas.get()
+    if ruta_excel and hoja:
+        cargar_hoja(ruta_excel, hoja)
 
-combo_hojas.bind("ComboboxSelected", on_hoja_seleccionada)
+combo_hojas.bind("<<ComboboxSelected>>", on_hoja_seleccionada)
+
+# Botón para cargar Excel y mostrar hojas
+Button(ventana, text="Visualizar Excel", command=cargar_archivo).grid(row=5, column=0, columnspan=3, pady=10)
+
+Button(ventana, text="Ir a Configuración", command=lambda: abrir_config_ini()).grid(row=6, column=0, pady=20)
+Button(ventana, text="Acción 2", command=lambda: label_estado.config(text="Acción 2 ejecutada")).grid(row=6, column=1, pady=10)
+Button(ventana, text="Acción 3", command=lambda: label_estado.config(text="Acción 3 ejecutada")).grid(row=6, column=2, pady=10)
+
+# Configuración para cerrar y guardar si usas configparser
+def cargar_configuracion():
+    config = configparser.ConfigParser()
+    config.read(config_file)
+    if "Rutas" in config:
+        entry_excel.insert(0, config["Rutas"].get("ruta_excel", ""))
+        entry_carpeta.insert(0, config["Rutas"].get("ruta_carpeta", ""))
+
+def guardar_configuracion():
+    config = configparser.ConfigParser()
+    config["Rutas"] = {
+        "ruta_excel": entry_excel.get(),
+        "ruta_carpeta": entry_carpeta.get()
+    }
+    with open(config_file, "w") as configfile:
+        config.write(configfile)
 
 ventana.protocol("WM_DELETE_WINDOW", lambda: [guardar_configuracion(), ventana.destroy()])
 
 cargar_configuracion()
 
-# Iniciar la ventana
 ventana.mainloop()
