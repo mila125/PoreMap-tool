@@ -8,7 +8,7 @@ from datetime import datetime
 from pywinauto import Application, findwindows
 import time
 import threading
-from novawinmng import manejar_novawin, leer_csv_y_crear_dataframe,agregar_csv_a_plantilla_excel, guardar_dataframe_en_ini,generar_nombre_unico,agregar_dataframe_a_excel_sin_borrar,agregar_dataframe_a_nueva_hoja
+from novawinmng import manejar_novawin, leer_csv_y_crear_dataframe
 from pywinauto.keyboard import send_keys
 from openpyxl import Workbook
 import pandas as pd
@@ -34,8 +34,8 @@ def agregar_dataframe_a_nueva_hoja(archivo_excel, dataframe, nombre_hoja):
         
         # Escribir el DataFrame en la nueva hoja
         dataframe.to_excel(writer, sheet_name=nombre_hoja, index=False)
-            
-def BET_BI(df, ruta_excel, Rango_de_Absorpcion, Rango_de_Desorpcion):
+
+def BET_BI(df,Rango_de_Absorpcion, Rango_de_Desorpcion):
 
     # Verificar si las columnas necesarias existen en el DataFrame
     if 'Volume @ STP' not in df.columns or '1 / [ W((P/Po) - 1) ]' not in df.columns:
@@ -87,7 +87,7 @@ def BET_BI(df, ruta_excel, Rango_de_Absorpcion, Rango_de_Desorpcion):
     # Filtrar los últimos N elementos según el valor de Rango_de_Desorpcion
    
         
-def BET_P(df, ruta_excel, Rango_de_Absorpcion, Rango_de_Desorpcion):
+def BET_P(df, Rango_de_Absorpcion, Rango_de_Desorpcion):
 
     # Verificar si las columnas necesarias existen en el DataFrame
     if 'Volume @ STP' not in df.columns or '1 / [ W((P/Po) - 1) ]' not in df.columns:
@@ -154,7 +154,7 @@ def BET_P(df, ruta_excel, Rango_de_Absorpcion, Rango_de_Desorpcion):
     else:
         return False
     # Filtrar los últimos N elementos según el valor de Rango_de_Desorpcion
-def BET_C(df, ruta_excel, Rango_de_Absorpcion, Rango_de_Desorpcion):
+def BET_C(df, Rango_de_Absorpcion, Rango_de_Desorpcion):
 
 
     # Verificar si las columnas necesarias existen en el DataFrame
@@ -220,98 +220,51 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 import matplotlib.pyplot as plt
 import subprocess
 
-def tests_main(archivo_ruta_completa, archivo_excel):
+def tests_main(df_bet, directorio_guardado):
+    import os
+    import pandas as pd
+    import matplotlib.pyplot as plt
+
     print("Inicio de tests_main")
-    print(archivo_ruta_completa)
-    
-    # Crear un DataFrame para almacenar los resultados
+
     resultados = pd.DataFrame(columns=["Test", "Resultado", "Promedio_A", "Promedio_B", "División"])
+    df = df_bet.copy()
 
-    # Leer la hoja BET del archivo Excel
-    try:
-        df = pd.read_excel(archivo_excel, sheet_name="BET")
-    except Exception as e:
-        print(f"Error al abrir la hoja BET: {e}")
-        return
-
-    # Calcular el cambio relativo en la columna 'Relative Pressure'
+    # Calcular diferencia de presión relativa
     df['delta_pressure'] = df['Relative Pressure'].diff()
 
-    # Identificar índices donde ocurre una disminución significativa
-    umbral_disminucion = -0.05
-    puntos_disminucion = df[df['delta_pressure'] < umbral_disminucion]
-
-    print("Puntos de disminución:")
-    print(puntos_disminucion)
-
-    # Separar los datos en rangos de absorción y desorción según los cambios
     Rango_de_Absorpcion = df[df['delta_pressure'] >= 0]
     Rango_de_Desorpcion = df[df['delta_pressure'] < 0]
-
-    print("Rango de absorción:")
-    print(Rango_de_Absorpcion)
-
-    print("Rango de desorción:")
-    print(Rango_de_Desorpcion)
-
     num_absorcion = len(Rango_de_Absorpcion)
     num_desorcion = len(Rango_de_Desorpcion)
 
-    # Aquí asumo que estas funciones están definidas en tu código
-    resultado_bi = BET_BI(df, archivo_excel, num_absorcion, num_desorcion)
-    if resultado_bi:
-         resultados.loc[len(resultados)] = ["BET_BI", "Hay poros cuello de botella", "-", "-", "-"]
-    else:
-        resultados.loc[len(resultados)] = ["BET_BI", "No hay poros cuello de botella", "-", "-", "-"]
+    # Tests
+    resultado_bi = BET_BI(df, num_absorcion, num_desorcion)
+    resultado_p = BET_P(df, num_absorcion, num_desorcion)
+    resultado_c = BET_C(df, num_absorcion, num_desorcion)
 
-    resultado_p = BET_P(df, archivo_excel, num_absorcion, num_desorcion)
-    if resultado_p:
-        resultados.loc[len(resultados)] = ["BET_P", "Hay poros planos", "-", "-", "-"]
-    else:
-        resultados.loc[len(resultados)] = ["BET_P", "No hay poros planos", "-", "-", "-"]
+    resultados.loc[len(resultados)] = [
+        "BET_BI", "Hay poros cuello de botella" if resultado_bi else "No hay poros cuello de botella", "-", "-", "-"
+    ]
+    resultados.loc[len(resultados)] = [
+        "BET_P", "Hay poros planos" if resultado_p else "No hay poros planos", "-", "-", "-"
+    ]
+    resultados.loc[len(resultados)] = [
+        "BET_C", "Hay poros cilíndricos" if resultado_c else "No hay poros cilíndricos", "-", "-", "-"
+    ]
 
-    resultado_c = BET_C(df, archivo_excel, num_absorcion, num_desorcion)
-    if resultado_c:
-        resultados.loc[len(resultados)] = ["BET_C", "Hay poros cilindricos", "-", "-", "-"]
-    else:
-        resultados.loc[len(resultados)] = ["BET_C", "No hay poros cilindricos", "-", "-", "-"]
-
-    # Guardar resultados en una nueva hoja Excel (archivo_planilla.xlsx)
-    archivo_resultados = archivo_excel.replace(".xlsx", "_resultados.xlsx")
-
-    # Crear un nuevo archivo Excel si no existe
-    if not os.path.exists(archivo_resultados):
-        wb = openpyxl.Workbook()
-        wb.save(archivo_resultados)
-
-    # Abrir el archivo Excel de resultados
-    wb = openpyxl.load_workbook(archivo_resultados)
-
-    # Si la hoja ya existe, eliminarla
-    if "Resultados Tests" in wb.sheetnames:
-        del wb["Resultados Tests"]
-
-    # Crear una nueva hoja "Resultados Tests" con los datos actualizados
-    ws = wb.create_sheet("Resultados Tests")
-
-    # Escribir los resultados en la hoja
-    for r in dataframe_to_rows(resultados, index=False, header=True):
-        ws.append(r)
-
-    wb.save(archivo_resultados)
-
-    # Generar gráficos (ejemplo: histograma de 'Volume @ STP')
+    # Generar gráfico
     plt.hist(df['Volume @ STP'], bins=20, color='blue', alpha=0.7)
     plt.title("Histograma de Volume @ STP")
     plt.xlabel("Volume @ STP")
     plt.ylabel("Frecuencia")
-    grafico_path = os.path.join(os.path.dirname(archivo_ruta_completa), "histograma.png")
-    plt.savefig(grafico_path)
+    plt.tight_layout()
+
+    # Guardar imagen temporal
+    grafico_path = os.path.join(directorio_guardado, "histograma.png")
+    plt.savefig(grafico_path, dpi=300)
     plt.close()
 
-    print("Proceso completado y gráficos generados.")
+    print("Resultados y gráfico generados.")
 
-    # Ejecutar un módulo específico (ajusta según necesites)
-    result = subprocess.run(["python", "-m", "novarep_ide"], capture_output=True, text=True)
-    print("Salida estándar:", result.stdout)
-    print("Errores estándar:", result.stderr)
+    return resultados, grafico_path

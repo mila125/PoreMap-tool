@@ -37,16 +37,44 @@ def cesaro_fractal(ax, p1, p2, nivel):
         cesaro_fractal(ax, B, p2, nivel - 1)
 
 
-def visualizar_poro_fractal(ruta_excel, hoja="BJH", columna="Pore Width (nm)", nivel=3):
-    ancho_poro_nm = leer_dimension_poro_desde_excel(ruta_excel, hoja, columna)
-    escala = ancho_poro_nm  # puedes escalar a gusto
+def visualizar_poro_fractal(ruta_excel, carpeta_salida, hoja="BJH", columna="Pore Width (nm)", nivel=3):
+    try:
+        ancho_poro_nm = leer_dimension_poro_desde_excel(ruta_excel, hoja, columna)
+        escala = ancho_poro_nm
 
-    fig, ax = plt.subplots(figsize=(8, 2))
-    p1 = (0, 0)
-    p2 = (escala, 0)
+        fig, ax = plt.subplots(figsize=(8, 2))
+        p1 = (0, 0)
+        p2 = (escala, 0)
 
-    cesaro_fractal(ax, p1, p2, nivel)
-    ax.set_aspect('equal')
-    ax.set_title(f"Fractal tipo Cesàro (simulación de poro: {ancho_poro_nm:.2f} nm)")
-    ax.axis('off')
-    plt.show()
+        cesaro_fractal(ax, p1, p2, nivel)
+        ax.set_aspect('equal')
+        ax.set_title(f"Fractal tipo Cesàro (simulación de poro: {ancho_poro_nm:.2f} nm)")
+        ax.axis('off')
+
+        # --- Guardar imagen en la carpeta proporcionada ---
+        if not os.path.isdir(carpeta_salida):
+            os.makedirs(carpeta_salida)
+
+        nombre_imagen = "poro_fractal.png"
+        ruta_imagen = os.path.join(carpeta_salida, nombre_imagen)
+        fig.savefig(ruta_imagen, bbox_inches='tight')
+        plt.close(fig)
+
+        # --- Insertar en Excel en hoja nueva ---
+        wb = load_workbook(ruta_excel)
+        if "Vista de los poros" not in wb.sheetnames:
+            wb.create_sheet("Vista de los poros")
+        hoja_poro = wb["Vista de los poros"]
+
+        img_excel = ExcelImage(ruta_imagen)
+        img_excel.anchor = "A1"
+        hoja_poro.add_image(img_excel)
+
+        wb.save(ruta_excel)
+        wb.close()
+
+        return True
+
+    except Exception as e:
+        print(f"Error al generar fractal: {e}")
+        return False
